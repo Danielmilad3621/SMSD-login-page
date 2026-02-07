@@ -3,7 +3,7 @@
    Cache-first strategy for static assets, offline fallback
    ============================================================ */
 
-const CACHE_NAME = 'scout-v1';
+const CACHE_NAME = 'scout-v2';
 
 // App shell — essential assets to pre-cache on install
 const APP_SHELL = [
@@ -11,6 +11,7 @@ const APP_SHELL = [
   './index.html',
   './styles.css',
   './app.js',
+  './invited-users.json',
   './manifest.webmanifest',
   './assets/scout-logo.svg',
   './offline.html'
@@ -52,6 +53,9 @@ self.addEventListener('fetch', (event) => {
 
   // Only handle GET requests
   if (request.method !== 'GET') return;
+
+  // Don't cache Supabase API calls — always go to network
+  if (request.url.includes('supabase.co')) return;
 
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
