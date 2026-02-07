@@ -1,20 +1,23 @@
 /* ============================================================
    Scout PWA — app.js
-   Handles screen transitions, form validation, toasts,
-   and invite-only email gate (no password auth).
+   Handles screen transitions, toasts, Google OAuth via Supabase,
+   and invite-only email allowlist gate.
    ============================================================ */
 
 (function () {
   'use strict';
 
+  /* ── Supabase configuration ──────────────────────────────── */
+  const SUPABASE_URL  = 'https://yhnjsvzfkoeqcgzlqvnj.supabase.co';
+  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlobmpzdnpma29lcWNnemxxdm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NTg0NDMsImV4cCI6MjA4NjAzNDQ0M30.eNZXFZ7vTQJfyWmULSoaN3pXKmDbl6e6YV2c_AlwMk4';
+
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
   /* ── Constants ──────────────────────────────────────────── */
-  const SESSION_KEY  = 'scout_session';
-  const SESSION_TTL  = 24 * 60 * 60 * 1000; // 24 hours in ms
-  const MAX_INVITED  = 10;                   // guard: warn if list > 10
+  const MAX_INVITED = 10; // guard: warn if list > 10
 
   /* ── DOM references ───────────────────────────────────────── */
-  const $  = (sel) => document.querySelector(sel);
-  const $$ = (sel) => document.querySelectorAll(sel);
+  const $ = (sel) => document.querySelector(sel);
 
   const screens = {
     splash:   $('#splash'),
@@ -22,15 +25,9 @@
     loggedIn: $('#logged-in'),
   };
 
-  const toast = $('#toast');
-
-  // Login form elements
-  const emailInput   = $('#email');
-  const btnLogin     = $('#btn-login');
-  const loginForm    = $('#login-form');
-  const loginError   = $('#login-error');
-
-  // Logged-in screen elements
+  const toast      = $('#toast');
+  const btnGoogle   = $('#btn-google');
+  const loginError  = $('#login-error');
   const welcomeEmail = $('#welcome-email');
   const btnLogout    = $('#btn-logout');
 
@@ -53,8 +50,6 @@
       }
     } catch (err) {
       console.error('[Scout] Could not load invited-users list:', err);
-      // Offline fallback: list stays empty; cached page will still
-      // load from the SW cache which includes invited-users.json
     }
   }
 
@@ -82,24 +77,6 @@
     currentScreen = target;
   }
 
-  /* ── Splash → next screen auto-transition ──────────────────── */
-  function initSplash() {
-    const logo = screens.splash.querySelector('.splash-logo');
-
-    setTimeout(() => {
-      logo.classList.add('idle');
-    }, 2200);
-
-    setTimeout(() => {
-      const session = getSession();
-      if (session) {
-        showLoggedIn(session.email);
-      } else {
-        showScreen('login', 'left');
-      }
-    }, 3200);
-  }
-
   /* ── Toast helper ─────────────────────────────────────────── */
   let toastTimeout;
   function showToast(message, duration = 2500) {
@@ -111,86 +88,91 @@
     }, duration);
   }
 
-  /* ── Login validation ─────────────────────────────────────── */
-  function validateLoginFields() {
-    const email = emailInput.value.trim();
-    btnLogin.disabled = !(email.length > 0);
-  }
-
-  /* ── Session helpers (localStorage) ───────────────────────── */
-  function saveSession(email) {
-    const session = {
-      email: email,
-      expiresAt: Date.now() + SESSION_TTL,
-    };
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  }
-
-  function getSession() {
-    try {
-      const raw = localStorage.getItem(SESSION_KEY);
-      if (!raw) return null;
-      const session = JSON.parse(raw);
-      if (Date.now() > session.expiresAt) {
-        localStorage.removeItem(SESSION_KEY);
-        return null;
-      }
-      return session;
-    } catch {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
-  }
-
-  function clearSession() {
-    localStorage.removeItem(SESSION_KEY);
-  }
-
   /* ── Show logged-in state ─────────────────────────────────── */
   function showLoggedIn(email) {
     welcomeEmail.textContent = email;
+    loginError.classList.remove('visible');
     showScreen('loggedIn', 'left');
     showToast('✅ Logged in successfully');
   }
 
-  /* ── Event listeners ──────────────────────────────────────── */
-  emailInput.addEventListener('input', () => {
-    loginError.classList.remove('visible');
-    validateLoginFields();
-  });
+  /* ── Check allowlist and handle auth result ────────────────── */
+  async function handleAuthUser(user) {
+    const email = (user.email || '').trim().toLowerCase();
 
-  loginForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-
-    const email = emailInput.value.trim().toLowerCase();
-
-    // Disable button and show loading state
-    btnLogin.disabled = true;
-    btnLogin.textContent = 'Checking…';
-
-    // Small delay to feel intentional
-    await new Promise((r) => setTimeout(r, 400));
-
-    if (invitedEmails.includes(email)) {
-      loginError.classList.remove('visible');
-      saveSession(email);
-      showLoggedIn(email);
-    } else {
-      loginError.textContent = "Access not granted — you're not on the invited list yet.";
-      loginError.classList.add('visible');
+    // Wait for invited list to be loaded
+    if (invitedEmails.length === 0) {
+      await loadInvitedUsers();
     }
 
-    btnLogin.textContent = 'Log In';
-    btnLogin.disabled = false;
-    validateLoginFields();
+    if (invitedEmails.includes(email)) {
+      showLoggedIn(email);
+    } else {
+      // Not on the allowlist — sign them out immediately
+      await supabase.auth.signOut();
+      loginError.textContent = "Access not granted — you're not on the invited list yet.";
+      loginError.classList.add('visible');
+      showScreen('login', 'right');
+    }
+  }
+
+  /* ── Google Sign-In button ─────────────────────────────────── */
+  btnGoogle.addEventListener('click', async () => {
+    loginError.classList.remove('visible');
+    btnGoogle.disabled = true;
+    btnGoogle.querySelector('span')?.remove(); // clean up if any
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+      },
+    });
+
+    if (error) {
+      loginError.textContent = 'Sign-in failed. Please try again.';
+      loginError.classList.add('visible');
+      console.error('[Scout] Google sign-in error:', error);
+    }
+
+    btnGoogle.disabled = false;
   });
 
-  btnLogout.addEventListener('click', () => {
-    clearSession();
-    emailInput.value = '';
-    btnLogin.disabled = true;
+  /* ── Logout ────────────────────────────────────────────────── */
+  btnLogout.addEventListener('click', async () => {
+    await supabase.auth.signOut();
     showScreen('login', 'right');
     showToast('Logged out');
+  });
+
+  /* ── Splash → next screen auto-transition ──────────────────── */
+  async function initSplash() {
+    const logo = screens.splash.querySelector('.splash-logo');
+
+    // Load invited list in background
+    await loadInvitedUsers();
+
+    setTimeout(() => {
+      logo.classList.add('idle');
+    }, 2200);
+
+    setTimeout(async () => {
+      // Check for an existing Supabase session
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (session && session.user) {
+        await handleAuthUser(session.user);
+      } else {
+        showScreen('login', 'left');
+      }
+    }, 3200);
+  }
+
+  /* ── Listen for auth state changes (handles OAuth redirect) ── */
+  supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' && session && session.user) {
+      await handleAuthUser(session.user);
+    }
   });
 
   /* ── Service Worker registration ──────────────────────────── */
@@ -208,7 +190,6 @@
   }
 
   /* ── Kick off ─────────────────────────────────────────────── */
-  loadInvitedUsers();
   initSplash();
 
 })();

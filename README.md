@@ -1,10 +1,52 @@
 # Scout — SMSD Login Page
 
-A static PWA-style login page with an invite-only email gate for testing.
+A static PWA-style login page with Google Sign-In and an invite-only email allowlist.
 
-## Invite-Only Gate
+## How It Works
 
-Only emails listed in `invited-users.json` can log in. No password is required — this is a testing-phase allowlist.
+1. User clicks **"Sign in with Google"** → redirected to Google consent screen.
+2. After Google sign-in, Supabase processes the OAuth and redirects back.
+3. The app checks if the user's Google email is in `invited-users.json`.
+4. **If invited** → shown the Welcome screen.
+5. **If NOT invited** → signed out immediately with an error message.
+
+## Setup (One-Time)
+
+### 1. Google Cloud — Create OAuth Credentials
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials).
+2. Create a new project (or use an existing one).
+3. Click **"Create Credentials"** → **"OAuth client ID"**.
+4. Choose **Web application** as the application type.
+5. Under **Authorized JavaScript origins**, add:
+   - `https://danielmilad3621.github.io` (your GitHub Pages domain)
+   - `http://localhost:8000` (for local testing)
+6. Under **Authorized redirect URIs**, add:
+   - `https://yhnjsvzfkoeqcgzlqvnj.supabase.co/auth/v1/callback`
+7. Click **Create** and copy the **Client ID** and **Client Secret**.
+
+> If the consent screen says "App not verified", go to **OAuth consent screen** → set it to **External** and add your test emails.
+
+### 2. Supabase — Enable Google Provider
+
+1. Go to [Supabase Dashboard → Authentication → Providers](https://supabase.com/dashboard/project/yhnjsvzfkoeqcgzlqvnj/auth/providers).
+2. Find **Google** in the list and toggle it **ON**.
+3. Paste your **Client ID** and **Client Secret** from step 1.
+4. Click **Save**.
+
+### 3. Supabase — Set Redirect URL
+
+1. Go to [Supabase Dashboard → Authentication → URL Configuration](https://supabase.com/dashboard/project/yhnjsvzfkoeqcgzlqvnj/auth/url-configuration).
+2. Set **Site URL** to your live site URL:
+   - `https://danielmilad3621.github.io/SMSD-login-page/`
+3. Under **Redirect URLs**, add:
+   - `https://danielmilad3621.github.io/SMSD-login-page/`
+   - `http://localhost:8000/` (for local testing)
+4. Click **Save**.
+
+## Invite-Only Allowlist
+
+Only emails listed in `invited-users.json` can access the app.
 
 ### How to Add More Invited Emails (up to 10)
 
@@ -23,11 +65,12 @@ Only emails listed in `invited-users.json` can log in. No password is required �
 ```
 
 3. Save the file. A console warning will appear if the list exceeds 10 emails.
-4. If using the PWA offline, bump the `CACHE_NAME` version in `service-worker.js` (e.g. `scout-v3`) so the updated list propagates to cached clients.
+4. Bump the `CACHE_NAME` version in `service-worker.js` (e.g. `scout-v4`) so the updated list propagates to cached PWA clients.
+5. Commit and push to GitHub.
 
-### How to Test Locally
+## How to Test Locally
 
-1. Serve the project with any static file server. For example:
+1. Serve the project with any static file server:
 
 ```bash
 # Using Python
@@ -37,15 +80,14 @@ python3 -m http.server 8000
 npx serve .
 ```
 
-2. Open `http://localhost:8000` (or the port shown) in your browser.
-3. Enter an invited email → you should see the "Welcome" screen.
-4. Enter a non-invited email → you should see "Access not granted" error.
-5. Close and re-open the tab → session persists for 24 hours.
-6. Click "Log Out" → returns to the login screen.
+2. Open `http://localhost:8000` in your browser.
+3. Click "Sign in with Google" → sign in with an invited email → see the Welcome screen.
+4. Sign in with a non-invited email → see "Access not granted" error.
+5. Click "Log Out" → returns to login screen.
 
-### Session Behaviour
+## Deploy to GitHub Pages
 
-- Login session is stored in `localStorage` with a 24-hour expiry.
-- On page load, if a valid session exists the login screen is skipped.
-- Logging out clears the session immediately.
-
+1. In your repo, go to **Settings → Pages**.
+2. Under **Source**, select **Deploy from a branch**.
+3. Choose the **main** branch and **/ (root)** folder.
+4. Click **Save**. Your site will be live at `https://danielmilad3621.github.io/SMSD-login-page/`.
