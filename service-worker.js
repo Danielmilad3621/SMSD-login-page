@@ -3,7 +3,7 @@
    Cache-first strategy for static assets, offline fallback
    ============================================================ */
 
-const CACHE_NAME = 'scout-v3';
+const CACHE_NAME = 'scout-v4';
 
 // App shell — essential assets to pre-cache on install
 const APP_SHELL = [
@@ -11,7 +11,6 @@ const APP_SHELL = [
   './index.html',
   './styles.css',
   './app.js',
-  './invited-users.json',
   './manifest.webmanifest',
   './assets/scout-logo.svg',
   './offline.html'

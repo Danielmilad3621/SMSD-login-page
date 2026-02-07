@@ -1,7 +1,7 @@
 /* ============================================================
    Scout PWA — app.js
    Handles screen transitions, toasts, Google OAuth via Supabase,
-   and invite-only email allowlist gate.
+   and invite-only email allowlist (server-side via Supabase DB).
    ============================================================ */
 
 (function () {
@@ -13,9 +13,6 @@
 
   const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
-  /* ── Constants ──────────────────────────────────────────── */
-  const MAX_INVITED = 10; // guard: warn if list > 10
-
   /* ── DOM references ───────────────────────────────────────── */
   const $ = (sel) => document.querySelector(sel);
 
@@ -25,33 +22,11 @@
     loggedIn: $('#logged-in'),
   };
 
-  const toast      = $('#toast');
-  const btnGoogle   = $('#btn-google');
-  const loginError  = $('#login-error');
-  const welcomeEmail = $('#welcome-email');
-  const btnLogout    = $('#btn-logout');
-
-  /* ── Invited-users list (loaded from JSON) ────────────────── */
-  let invitedEmails = [];
-
-  async function loadInvitedUsers() {
-    try {
-      const res = await fetch('./invited-users.json');
-      if (!res.ok) throw new Error('Failed to fetch invited-users.json');
-      const data = await res.json();
-      invitedEmails = (data.invitedEmails || []).map(e => e.trim().toLowerCase());
-
-      if (invitedEmails.length > MAX_INVITED) {
-        console.warn(
-          `[Scout] ⚠️  Invited list has ${invitedEmails.length} users — ` +
-          `exceeds the recommended max of ${MAX_INVITED}. ` +
-          `Consider migrating to a database-backed solution.`
-        );
-      }
-    } catch (err) {
-      console.error('[Scout] Could not load invited-users list:', err);
-    }
-  }
+  const toast         = $('#toast');
+  const btnGoogle     = $('#btn-google');
+  const loginError    = $('#login-error');
+  const welcomeEmail  = $('#welcome-email');
+  const btnLogout     = $('#btn-logout');
 
   /* ── Current screen tracking ──────────────────────────────── */
   let currentScreen = 'splash';
@@ -96,16 +71,31 @@
     showToast('✅ Logged in successfully');
   }
 
-  /* ── Check allowlist and handle auth result ────────────────── */
+  /* ── Check allowlist via Supabase DB (server-side) ─────────── */
+  async function isEmailInvited(email) {
+    // Query the invited_users table.
+    // RLS ensures the user can ONLY see their own row (if it exists).
+    const { data, error } = await supabase
+      .from('invited_users')
+      .select('email')
+      .eq('email', email.trim().toLowerCase())
+      .maybeSingle();
+
+    if (error) {
+      console.error('[Scout] Error checking allowlist:', error);
+      return false;
+    }
+
+    return data !== null;
+  }
+
+  /* ── Handle authenticated user ─────────────────────────────── */
   async function handleAuthUser(user) {
     const email = (user.email || '').trim().toLowerCase();
 
-    // Wait for invited list to be loaded
-    if (invitedEmails.length === 0) {
-      await loadInvitedUsers();
-    }
+    const invited = await isEmailInvited(email);
 
-    if (invitedEmails.includes(email)) {
+    if (invited) {
       showLoggedIn(email);
     } else {
       // Not on the allowlist — sign them out immediately
@@ -120,7 +110,6 @@
   btnGoogle.addEventListener('click', async () => {
     loginError.classList.remove('visible');
     btnGoogle.disabled = true;
-    btnGoogle.querySelector('span')?.remove(); // clean up if any
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -146,11 +135,8 @@
   });
 
   /* ── Splash → next screen auto-transition ──────────────────── */
-  async function initSplash() {
+  function initSplash() {
     const logo = screens.splash.querySelector('.splash-logo');
-
-    // Load invited list in background
-    await loadInvitedUsers();
 
     setTimeout(() => {
       logo.classList.add('idle');
