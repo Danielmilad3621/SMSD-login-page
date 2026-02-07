@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+
+  <!-- PWA meta -->
+  <meta name="theme-color" content="#169B62">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Scout">
+  <meta name="description" content="Scout — Explore, connect, and discover.">
+
+  <!-- Manifest -->
+  <link rel="manifest" href="manifest.webmanifest">
+
+  <!-- Favicon -->
+  <link rel="icon" href="assets/scout-logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/scout-logo.svg">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css">
+
+  <title>Scout</title>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 1 — Splash
+       ═══════════════════════════════════════════════════════ -->
+  <section id="splash" class="screen active" aria-label="Splash screen">
+    <svg class="splash-logo" viewBox="0 0 270 195" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <g id="scout-monogram">
+        <!-- S — scaled to same height as M, S, D -->
+        <path id="s-path"
+          d="M50 55
+             C 29 55, 18 68, 18 79
+             C 18 92, 32 97, 50 100
+             C 69 103, 82 108, 82 121
+             C 82 134, 69 145, 50 145
+             C 34 145, 24 137, 21 127"
+          stroke="#169B62" stroke-width="8" stroke-linecap="round" fill="none"/>
+        <circle cx="50" cy="55" r="4" fill="#169B62"/>
+        <circle cx="21" cy="127" r="3" fill="#169B62"/>
+      </g>
+      <!-- M, S, D drawn as stroke paths — all same height as S -->
+      <g id="smsd-wordmark">
+        <path id="m-path"
+          d="M92 145 L92 55 L119 125 L147 55 L147 145"
+          stroke="#169B62" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <path id="s2-path"
+          d="M193 67
+             C 189 57, 167 55, 162 66
+             C 157 77, 189 92, 193 105
+             C 197 118, 177 145, 162 138"
+          stroke="#169B62" stroke-width="8" stroke-linecap="round" fill="none"/>
+        <path id="d-path"
+          d="M212 145 L212 55
+             C 232 55, 252 72, 252 100
+             C 252 128, 232 145, 212 145"
+          stroke="#169B62" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </g>
+      <text id="scout-wordmark"
+        x="135" y="182"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+        font-size="18"
+        font-weight="500"
+        letter-spacing="5"
+        fill="#169B62">Scout</text>
+    </svg>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 2 — Login
+       ═══════════════════════════════════════════════════════ -->
+  <section id="login" class="screen" aria-label="Log in">
+    <!-- Green hero header -->
+    <div class="hero">
+      <svg class="hero-logo" viewBox="0 0 200 220" fill="white" xmlns="http://www.w3.org/2000/svg" aria-label="Scout emblem">
+        <!-- Outer circle -->
+        <circle cx="100" cy="95" r="88" fill="none" stroke="white" stroke-width="3"/>
+        <!-- Inner circle (border ring) -->
+        <circle cx="100" cy="95" r="80" fill="none" stroke="white" stroke-width="1.5"/>
+        <!-- Fleur-de-lis -->
+        <g transform="translate(100,90)">
+          <!-- Center petal (tall) -->
+          <path d="M0,-62 C-4,-55 -6,-40 -6,-28 C-6,-16 -3,-8 0,0 C3,-8 6,-16 6,-28 C6,-40 4,-55 0,-62Z" fill="white"/>
+          <!-- Center petal top circle -->
+          <circle cx="0" cy="-65" r="5" fill="white"/>
+          <!-- Left petal -->
+          <path d="M-8,-2 C-14,-18 -28,-36 -40,-42 C-48,-46 -54,-44 -56,-38 C-58,-32 -54,-24 -44,-18 C-34,-12 -22,-6 -8,-2Z" fill="white"/>
+          <!-- Right petal -->
+          <path d="M8,-2 C14,-18 28,-36 40,-42 C48,-46 54,-44 56,-38 C58,-32 54,-24 44,-18 C34,-12 22,-6 8,-2Z" fill="white"/>
+          <!-- Left petal curl (inward) -->
+          <path d="M-44,-18 C-38,-14 -30,-16 -26,-22 C-22,-28 -24,-36 -30,-38" fill="none" stroke="white" stroke-width="2"/>
+          <!-- Right petal curl (inward) -->
+          <path d="M44,-18 C38,-14 30,-16 26,-22 C22,-28 24,-36 30,-38" fill="none" stroke="white" stroke-width="2"/>
+          <!-- Left small petal / teardrop -->
+          <ellipse cx="-22" cy="-30" rx="4" ry="6" transform="rotate(30 -22 -30)" fill="white" opacity="0.9"/>
+          <!-- Right small petal / teardrop -->
+          <ellipse cx="22" cy="-30" rx="4" ry="6" transform="rotate(-30 22 -30)" fill="white" opacity="0.9"/>
+          <!-- Center band / belt -->
+          <rect x="-12" y="-4" width="24" height="8" rx="2" fill="none" stroke="white" stroke-width="2"/>
+          <!-- Base / stem -->
+          <path d="M-6,4 L-8,16 L0,12 L8,16 L6,4Z" fill="white"/>
+        </g>
+        <!-- Rope / reef knot at bottom -->
+        <g transform="translate(100,185)">
+          <path d="M-20,0 C-16,-6 -8,-8 0,-6 C8,-8 16,-6 20,0" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M-14,2 C-10,8 -4,10 0,8 C4,10 10,8 14,2" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Rope ends hanging down -->
+          <path d="M-20,0 C-24,6 -26,14 -22,20" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <path d="M20,0 C24,6 26,14 22,20" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round"/>
+          <!-- Knot center -->
+          <circle cx="0" cy="2" r="3" fill="white"/>
+        </g>
+      </svg>
+    </div>
+
+    <!-- White card -->
+    <div class="card">
+      <h1 class="title">Welcome to Scout</h1>
+      <p class="subtitle">Log in to continue</p>
+
+      <form id="login-form" autocomplete="off" novalidate>
+        <!-- Username -->
+        <div class="input-group">
+          <label for="username">Username</label>
+          <input type="text" id="username" class="input-standalone" placeholder="Enter your username" autocomplete="username" required>
+        </div>
+
+        <!-- Password -->
+        <div class="input-group">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input type="password" id="password" class="input-standalone" placeholder="Enter your password" autocomplete="current-password" required>
+            <button type="button" class="password-toggle" id="toggle-password" aria-label="Show password">
+              <svg class="eye-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg class="eye-off-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <p class="error-text" id="login-error">Invalid username or password.</p>
+        </div>
+
+        <!-- Log In button -->
+        <button type="submit" class="btn btn-primary" id="btn-login" disabled>Log In</button>
+      </form>
+    </div>
+  </section>
+
+</div><!-- /#app -->
+
+<!-- Toast -->
+<div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<!-- App JS -->
+<script src="app.js"></script>
+
+</body>
+</html>
+
