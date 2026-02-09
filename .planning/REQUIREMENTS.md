@@ -115,15 +115,18 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 
 | REQ-ID | Category | Phase | Status |
 |--------|----------|-------|--------|
-| PERM-01 to PERM-08 | Permission System | TBD | Pending |
-| PART-01 to PART-08 | Participant Management | TBD | Pending |
-| MEET-01 to MEET-06 | Meeting Management | TBD | Pending |
-| ATTEND-01 to ATTEND-10 | Attendance Taking | TBD | Pending |
-| POINT-01 to POINT-08 | Points System | TBD | Pending |
-| REPORT-01 to REPORT-09 | Reporting & Export | TBD | Pending |
-| DATA-01 to DATA-07 | Data Management | TBD | Pending |
+| DATA-01 to DATA-07 | Data Management | Phase 1 | Pending |
+| PERM-01, PERM-02, PERM-07 | Permission System | Phase 1 | Pending |
+| PERM-03, PERM-04, PERM-08 | Permission System | Phase 2 | Pending |
+| PART-01 to PART-08 | Participant Management | Phase 2 | Pending |
+| MEET-01 to MEET-06 | Meeting Management | Phase 3 | Pending |
+| ATTEND-01 to ATTEND-10 | Attendance Taking | Phase 4 | Pending |
+| PERM-05 | Permission System | Phase 4 | Pending |
+| POINT-01 to POINT-08 | Points System | Phase 5 | Pending |
+| REPORT-01 to REPORT-09 | Reporting & Export | Phase 6 | Pending |
+| PERM-03, PERM-04 | Permission System | Phase 6 | Pending |
 
-*Traceability will be updated when roadmap is created*
+**All 48 requirements mapped to phases ✓**
 
 ## Requirement Quality
 
