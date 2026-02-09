@@ -9,23 +9,23 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 
 - [x] **PERM-01**: System supports four role types: Admin, Admin Leader, Leader, Viewer — Phase 1
 - [x] **PERM-02**: User role stored in Supabase (extend auth.users table or separate roles table) — Phase 1
-- [ ] **PERM-03**: Admin has full system access (all features)
-- [ ] **PERM-04**: Admin Leaders (2-3 people) can create meetings and take attendance
+- [x] **PERM-03**: Admin has full system access (all features) — Phase 2
+- [x] **PERM-04**: Admin Leaders (2-3 people) can create meetings and take attendance — Phase 2
 - [ ] **PERM-05**: Leaders can take attendance for scouts and other leaders
 - [ ] **PERM-06**: Viewers have read-only access (can view but not edit)
 - [x] **PERM-07**: Permission checks enforced server-side via Supabase RLS policies — Phase 1
-- [ ] **PERM-08**: UI hides features user doesn't have permission to access
+- [x] **PERM-08**: UI hides features user doesn't have permission to access — Phase 2
 
 ### Participant Management
 
-- [ ] **PART-01**: Admin/Admin Leader can add new scout to system (name, email required)
-- [ ] **PART-02**: Admin/Admin Leader can edit scout information (name, email)
-- [ ] **PART-03**: Admin/Admin Leader can view list of all scouts
-- [ ] **PART-04**: Admin/Admin Leader can search/filter scouts by name
-- [ ] **PART-05**: System displays scout's total points alongside name in lists
-- [ ] **PART-06**: Admin/Admin Leader can add new leader to system (name, email, role)
-- [ ] **PART-07**: Admin/Admin Leader can view list of all leaders
-- [ ] **PART-08**: System prevents duplicate scouts (same email)
+- [x] **PART-01**: Admin/Admin Leader can add new scout to system (name, email required) — Phase 2
+- [x] **PART-02**: Admin/Admin Leader can edit scout information (name, email) — Phase 2
+- [x] **PART-03**: Admin/Admin Leader can view list of all scouts — Phase 2
+- [x] **PART-04**: Admin/Admin Leader can search/filter scouts by name — Phase 2
+- [x] **PART-05**: System displays scout's total points alongside name in lists — Phase 2
+- [x] **PART-06**: Admin/Admin Leader can add new leader to system (name, email, role) — Phase 2
+- [x] **PART-07**: Admin/Admin Leader can view list of all leaders — Phase 2
+- [x] **PART-08**: System prevents duplicate scouts (same email) — Phase 2
 
 ### Meeting Management
 
