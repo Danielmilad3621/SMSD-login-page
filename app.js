@@ -23,6 +23,7 @@
     scouts:   $('#scouts-screen'),
     leaders:  $('#leaders-screen'),
     meetings: $('#meetings-screen'),
+    attendance: $('#attendance-screen'),
   };
 
   const toast         = $('#toast');
@@ -130,6 +131,11 @@
   async function canManageParticipants() {
     const role = await getUserRole();
     return role === 'Admin' || role === 'Admin Leader';
+  }
+  
+  async function canTakeAttendance() {
+    const role = await getUserRole();
+    return role === 'Admin' || role === 'Admin Leader' || role === 'Leader';
   }
   
   /* ── Setup navigation menu ─────────────────────────────────── */
@@ -276,6 +282,10 @@
   
   $('#meetings-back')?.addEventListener('click', () => {
     showScreen('loggedIn', 'right');
+  });
+  
+  $('#attendance-back')?.addEventListener('click', () => {
+    showScreen('meetings', 'right');
   });
   
   /* ── Scouts Management ─────────────────────────────────────── */
@@ -1130,6 +1140,13 @@
     const leaderNames = 'Loading...';
     const attendanceCount = 'Loading...';
     
+    // Check if meeting date is today or future (can take attendance)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const meetingDate = new Date(meeting.date);
+    meetingDate.setHours(0, 0, 0, 0);
+    const canTakeAttendanceForThisMeeting = meetingDate >= today;
+    
     return `
       <div class="participant-card meeting-card" data-meeting-id="${meeting.id}">
         <div class="card-header">
@@ -1153,6 +1170,13 @@
           <div class="card-detail" id="meeting-${meeting.id}-attendance">
             <strong>Attendance:</strong> ${attendanceCount}
           </div>
+          ${canTakeAttendanceForThisMeeting ? `
+          <div class="card-actions-inline">
+            <button class="btn btn-secondary btn-sm btn-take-attendance" data-meeting-id="${meeting.id}">
+              Take Attendance
+            </button>
+          </div>
+          ` : ''}
         </div>
       </div>
     `;
@@ -1183,6 +1207,17 @@
         const meeting = meetingsData.find(m => m.id === meetingId);
         if (meeting) {
           editMeeting(meeting);
+        }
+      });
+    });
+    
+    // Attach "Take Attendance" button listeners
+    document.querySelectorAll('.btn-take-attendance').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const meetingId = e.target.closest('.btn-take-attendance').dataset.meetingId;
+        const meeting = meetingsData.find(m => m.id === meetingId);
+        if (meeting) {
+          openAttendanceScreen(meeting);
         }
       });
     });
@@ -1861,6 +1896,633 @@
       }
     });
   }
+  
+  /* ── Attendance Taking ──────────────────────────────────────── */
+  let selectedMeeting = null;
+  let attendanceData = {
+    scouts: [],
+    leaders: [],
+    existingAttendance: {} // Map of { scout_id: { status, points_earned }, leader_id: { status, points_earned } }
+  };
+  
+  async function openAttendanceScreen(meeting) {
+    // Check permission
+    if (!(await canTakeAttendance())) {
+      showToast('You do not have permission to take attendance.', 3000);
+      return;
+    }
+    
+    // Check if meeting date is today or future
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const meetingDate = new Date(meeting.date);
+    meetingDate.setHours(0, 0, 0, 0);
+    
+    if (meetingDate < today) {
+      showToast('Cannot take attendance for past meetings.', 3000);
+      return;
+    }
+    
+    selectedMeeting = meeting;
+    showScreen('attendance', 'left');
+    
+    // Load meetings for calendar/list
+    await loadAttendanceMeetings();
+    
+    // Load attendance data for selected meeting
+    await loadAttendanceData();
+  }
+  
+  async function loadAttendanceMeetings() {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      // Get user's groups if Leader
+      const role = await getUserRole();
+      let groupsFilter = null;
+      
+      if (role === 'Leader') {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: leader } = await supabase
+            .from('leaders')
+            .select('scout_groups')
+            .eq('user_id', user.id)
+            .eq('active', true)
+            .maybeSingle();
+          
+          if (leader && leader.scout_groups && leader.scout_groups.length > 0) {
+            groupsFilter = leader.scout_groups;
+          }
+        }
+      }
+      
+      // Build query
+      let query = supabase
+        .from('meetings')
+        .select('*')
+        .gte('date', today.toISOString().split('T')[0])
+        .order('date', { ascending: true });
+      
+      if (groupsFilter) {
+        query = query.overlaps('scout_groups', groupsFilter);
+      }
+      
+      const { data: meetings, error } = await query;
+      
+      if (error) throw error;
+      
+      // Render calendar and list
+      renderAttendanceCalendar(meetings || []);
+      renderAttendanceMeetingsList(meetings || []);
+    } catch (err) {
+      console.error('[Scout] Error loading attendance meetings:', err);
+      showToast('Failed to load meetings. Please try again.', 3000);
+    }
+  }
+  
+  function renderAttendanceCalendar(meetings) {
+    const calendarEl = $('#attendance-calendar');
+    if (!calendarEl) return;
+    
+    // Simple calendar - just show current month
+    const today = new Date();
+    const currentMonth = today.getMonth();
+    const currentYear = today.getFullYear();
+    
+    // Get first day of month and number of days
+    const firstDay = new Date(currentYear, currentMonth, 1);
+    const lastDay = new Date(currentYear, currentMonth + 1, 0);
+    const daysInMonth = lastDay.getDate();
+    const startDayOfWeek = firstDay.getDay();
+    
+    // Create calendar HTML
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
+                       'July', 'August', 'September', 'October', 'November', 'December'];
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    
+    let html = `<div class="calendar-header">`;
+    html += `<button class="btn-icon btn-calendar-prev" id="btn-calendar-prev">←</button>`;
+    html += `<h3>${monthNames[currentMonth]} ${currentYear}</h3>`;
+    html += `<button class="btn-icon btn-calendar-next" id="btn-calendar-next">→</button>`;
+    html += `</div>`;
+    
+    html += `<div class="calendar-grid">`;
+    // Day headers
+    dayNames.forEach(day => {
+      html += `<div class="calendar-day-header">${day}</div>`;
+    });
+    
+    // Empty cells for days before month starts
+    for (let i = 0; i < startDayOfWeek; i++) {
+      html += `<div class="calendar-day empty"></div>`;
+    }
+    
+    // Days of month
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(currentYear, currentMonth, day);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Check if this date has a meeting
+      const hasMeeting = meetings.some(m => {
+        const meetingDate = new Date(m.date);
+        return meetingDate.toISOString().split('T')[0] === dateStr;
+      });
+      
+      // Check if this date is today or future
+      const isToday = dateStr === today.toISOString().split('T')[0];
+      const isFuture = date > today;
+      const isSelectable = isToday || isFuture;
+      
+      // Check if this is the selected meeting date
+      const isSelected = selectedMeeting && 
+        new Date(selectedMeeting.date).toISOString().split('T')[0] === dateStr;
+      
+      html += `<div class="calendar-day ${hasMeeting ? 'has-meeting' : ''} ${isSelectable ? 'selectable' : ''} ${isSelected ? 'selected' : ''}" 
+                     data-date="${dateStr}" 
+                     ${isSelectable ? '' : 'style="opacity: 0.3; cursor: not-allowed;"'}>`;
+      html += `<span class="day-number">${day}</span>`;
+      if (hasMeeting) {
+        html += `<span class="meeting-indicator">●</span>`;
+      }
+      html += `</div>`;
+    }
+    
+    html += `</div>`;
+    
+    calendarEl.innerHTML = html;
+    
+    // Attach click handlers
+    document.querySelectorAll('.calendar-day.selectable').forEach(dayEl => {
+      dayEl.addEventListener('click', () => {
+        const dateStr = dayEl.dataset.date;
+        const meeting = meetings.find(m => {
+          const meetingDate = new Date(m.date);
+          return meetingDate.toISOString().split('T')[0] === dateStr;
+        });
+        
+        if (meeting) {
+          selectedMeeting = meeting;
+          loadAttendanceData();
+          updateSelectedMeetingDisplay();
+        }
+      });
+    });
+  }
+  
+  function renderAttendanceMeetingsList(meetings) {
+    const listEl = $('#attendance-meetings-list');
+    if (!listEl) return;
+    
+    if (meetings.length === 0) {
+      listEl.innerHTML = '<p class="empty-text">No upcoming meetings</p>';
+      return;
+    }
+    
+    let html = '';
+    meetings.forEach(meeting => {
+      const date = new Date(meeting.date);
+      const dateFormatted = formatMeetingDate(date);
+      const groups = (meeting.scout_groups || []).join(', ') || 'Not assigned';
+      const isSelected = selectedMeeting && selectedMeeting.id === meeting.id;
+      
+      html += `
+        <div class="meeting-list-item ${isSelected ? 'selected' : ''}" 
+             data-meeting-id="${meeting.id}">
+          <div class="meeting-item-date">${dateFormatted}</div>
+          <div class="meeting-item-details">
+            <div>${escapeHtml(meeting.location || 'No location')}</div>
+            <div class="meeting-item-groups">${escapeHtml(groups)}</div>
+          </div>
+        </div>
+      `;
+    });
+    
+    listEl.innerHTML = html;
+    
+    // Attach click handlers
+    document.querySelectorAll('.meeting-list-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const meetingId = item.dataset.meetingId;
+        const meeting = meetings.find(m => m.id === meetingId);
+        if (meeting) {
+          selectedMeeting = meeting;
+          loadAttendanceData();
+          updateSelectedMeetingDisplay();
+        }
+      });
+    });
+  }
+  
+  function updateSelectedMeetingDisplay() {
+    if (!selectedMeeting) return;
+    
+    const infoEl = $('#selected-meeting-info');
+    const titleEl = $('#selected-meeting-title');
+    const dateEl = $('#selected-meeting-date');
+    const locationEl = $('#selected-meeting-location');
+    const groupsEl = $('#selected-meeting-groups');
+    
+    if (infoEl) infoEl.style.display = 'block';
+    if (titleEl) titleEl.textContent = formatMeetingDate(new Date(selectedMeeting.date));
+    if (dateEl) dateEl.textContent = formatMeetingDate(new Date(selectedMeeting.date));
+    if (locationEl) locationEl.textContent = selectedMeeting.location || 'Not specified';
+    if (groupsEl) groupsEl.textContent = (selectedMeeting.scout_groups || []).join(', ') || 'Not assigned';
+    
+    // Update selected state in list
+    document.querySelectorAll('.meeting-list-item').forEach(item => {
+      if (item.dataset.meetingId === selectedMeeting.id) {
+        item.classList.add('selected');
+      } else {
+        item.classList.remove('selected');
+      }
+    });
+  }
+  
+  async function loadAttendanceData() {
+    if (!selectedMeeting) return;
+    
+    const loadingEl = $('#attendance-loading');
+    if (loadingEl) loadingEl.style.display = 'block';
+    
+    try {
+      // Load scouts for meeting's groups
+      const scoutGroups = selectedMeeting.scout_groups || [];
+      if (scoutGroups.length === 0) {
+        showToast('Meeting has no scout groups assigned.', 3000);
+        return;
+      }
+      
+      const { data: scouts, error: scoutsError } = await supabase
+        .from('scouts')
+        .select('*')
+        .in('scout_group', scoutGroups)
+        .order('name', { ascending: true });
+      
+      if (scoutsError) throw scoutsError;
+      
+      // Load leaders for meeting's groups
+      const { data: leaders, error: leadersError } = await supabase
+        .from('leaders')
+        .select('*')
+        .eq('active', true)
+        .overlaps('scout_groups', scoutGroups)
+        .order('name', { ascending: true });
+      
+      if (leadersError) throw leadersError;
+      
+      // Load existing attendance records (scouts only for now)
+      const { data: attendance, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('*')
+        .eq('meeting_id', selectedMeeting.id);
+      
+      if (attendanceError) throw attendanceError;
+      
+      // Map attendance by scout_id
+      const attendanceMap = {};
+      (attendance || []).forEach(record => {
+        if (record.scout_id) {
+          attendanceMap[`scout_${record.scout_id}`] = {
+            status: record.status,
+            points_earned: record.points_earned || 0
+          };
+        }
+        // Leader attendance not stored in database for v1
+      });
+      
+      attendanceData.scouts = scouts || [];
+      attendanceData.leaders = leaders || [];
+      attendanceData.existingAttendance = attendanceMap;
+      
+      // Render attendance lists
+      renderScoutsAttendanceList();
+      renderLeadersAttendanceList();
+      
+      updateSelectedMeetingDisplay();
+    } catch (err) {
+      console.error('[Scout] Error loading attendance data:', err);
+      showToast('Failed to load attendance data. Please try again.', 3000);
+    } finally {
+      if (loadingEl) loadingEl.style.display = 'none';
+    }
+  }
+  
+  function renderScoutsAttendanceList() {
+    const listEl = $('#scouts-attendance-list');
+    const sectionEl = $('#scouts-attendance-section');
+    
+    if (!listEl || !sectionEl) return;
+    
+    if (attendanceData.scouts.length === 0) {
+      sectionEl.style.display = 'none';
+      return;
+    }
+    
+    sectionEl.style.display = 'block';
+    
+    // Group scouts by scout_group
+    const grouped = {};
+    attendanceData.scouts.forEach(scout => {
+      const group = scout.scout_group || 'Unknown';
+      if (!grouped[group]) {
+        grouped[group] = [];
+      }
+      grouped[group].push(scout);
+    });
+    
+    let html = '';
+    
+    Object.keys(grouped).sort().forEach(group => {
+      html += `<div class="attendance-group">`;
+      html += `<h3 class="group-header">${escapeHtml(group)}</h3>`;
+      html += `<div class="attendance-group-list">`;
+      
+      grouped[group].forEach(scout => {
+        const existing = attendanceData.existingAttendance[`scout_${scout.id}`];
+        const isSaved = !!existing;
+        const status = existing ? existing.status : null;
+        const pointsEarned = existing ? existing.points_earned : 0;
+        
+        html += renderAttendanceItem('scout', scout.id, scout.name, status, pointsEarned, isSaved);
+      });
+      
+      html += `</div></div>`;
+    });
+    
+    listEl.innerHTML = html;
+    
+    // Attach event listeners
+    attachAttendanceEventListeners('scout');
+  }
+  
+  function renderLeadersAttendanceList() {
+    const listEl = $('#leaders-attendance-list');
+    const sectionEl = $('#leaders-attendance-section');
+    
+    if (!listEl || !sectionEl) return;
+    
+    if (attendanceData.leaders.length === 0) {
+      sectionEl.style.display = 'none';
+      return;
+    }
+    
+    sectionEl.style.display = 'block';
+    
+    let html = '';
+    
+    attendanceData.leaders.forEach(leader => {
+      // For leaders, we'll use a different key pattern
+      const existing = attendanceData.existingAttendance[`leader_${leader.id}`];
+      const isSaved = !!existing;
+      const status = existing ? existing.status : null;
+      const pointsEarned = existing ? existing.points_earned : 0;
+      
+      html += renderAttendanceItem('leader', leader.id, leader.name, status, pointsEarned, isSaved);
+    });
+    
+    listEl.innerHTML = html;
+    
+    // Attach event listeners
+    attachAttendanceEventListeners('leader');
+  }
+  
+  function renderAttendanceItem(type, id, name, status, pointsEarned, isSaved) {
+    const statusClass = status === 'Present' ? 'present' : status === 'Absent' ? 'absent' : '';
+    const disabledAttr = isSaved ? 'disabled' : '';
+    const savedIndicator = isSaved ? '<span class="saved-indicator">✓ Saved</span>' : '';
+    
+    return `
+      <div class="attendance-item" data-type="${type}" data-id="${id}">
+        <div class="attendance-item-name">${escapeHtml(name)}${savedIndicator}</div>
+        <div class="attendance-item-controls">
+          <div class="attendance-toggle ${statusClass}" data-status="${status || 'unmarked'}" ${disabledAttr}>
+            <button class="toggle-btn toggle-present ${status === 'Present' ? 'active' : ''}" 
+                    ${disabledAttr} 
+                    aria-label="Mark as present">
+              ✓ Present
+            </button>
+            <button class="toggle-btn toggle-absent ${status === 'Absent' ? 'active' : ''}" 
+                    ${disabledAttr} 
+                    aria-label="Mark as absent">
+              ✗ Absent
+            </button>
+          </div>
+          <div class="activity-points-input">
+            <label>Activity Points:</label>
+            <input type="number" 
+                   class="points-input" 
+                   data-type="${type}" 
+                   data-id="${id}" 
+                   value="${pointsEarned > 0 ? pointsEarned - (status === 'Present' ? 1 : 0) : ''}" 
+                   min="0" 
+                   step="1" 
+                   placeholder="0"
+                   ${disabledAttr}>
+          </div>
+          <div class="attendance-feedback" data-feedback-id="${type}-${id}"></div>
+        </div>
+      </div>
+    `;
+  }
+  
+  function attachAttendanceEventListeners(type) {
+    // Toggle buttons
+    document.querySelectorAll(`.attendance-item[data-type="${type}"] .toggle-btn`).forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        if (btn.disabled) return;
+        
+        const item = btn.closest('.attendance-item');
+        const id = item.dataset.id;
+        const isPresent = btn.classList.contains('toggle-present');
+        const status = isPresent ? 'Present' : 'Absent';
+        
+        await saveAttendance(type, id, status);
+      });
+    });
+    
+    // Activity points input
+    document.querySelectorAll(`.attendance-item[data-type="${type}"] .points-input`).forEach(input => {
+      input.addEventListener('blur', async (e) => {
+        if (input.disabled) return;
+        
+        const item = input.closest('.attendance-item');
+        const id = item.dataset.id;
+        const statusEl = item.querySelector('.attendance-toggle');
+        const currentStatus = statusEl.dataset.status;
+        
+        if (currentStatus && currentStatus !== 'unmarked') {
+          // Re-save with updated activity points
+          await saveAttendance(type, id, currentStatus, parseInt(input.value) || 0);
+        }
+      });
+    });
+  }
+  
+  async function saveAttendance(type, id, status, activityPoints = 0) {
+    if (!selectedMeeting) return;
+    
+    const item = $(`.attendance-item[data-type="${type}"][data-id="${id}"]`);
+    if (!item) return;
+    
+    const feedbackEl = item.querySelector('.attendance-feedback');
+    const toggleEl = item.querySelector('.attendance-toggle');
+    const presentBtn = item.querySelector('.toggle-present');
+    const absentBtn = item.querySelector('.toggle-absent');
+    const pointsInput = item.querySelector('.points-input');
+    
+    // Show loading state
+    if (feedbackEl) {
+      feedbackEl.innerHTML = '<span class="loading-indicator">Saving...</span>';
+      feedbackEl.style.display = 'block';
+    }
+    
+    if (presentBtn) presentBtn.disabled = true;
+    if (absentBtn) absentBtn.disabled = true;
+    if (pointsInput) pointsInput.disabled = true;
+    
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+      
+      // Calculate points_earned
+      const basePoints = status === 'Present' ? 1 : 0;
+      const pointsEarned = basePoints + activityPoints;
+      
+      // Get the leader record for the current user (for leader_id field)
+      const { data: leaderRecord } = await supabase
+        .from('leaders')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      
+      // For leaders, we can't store attendance in the current schema
+      // The attendance table only supports scout attendance
+      // Leader attendance tracking would require a schema change
+      if (type === 'leader') {
+        // For v1, leader attendance is UI-only (not persisted)
+        // Show success feedback but don't save to database
+        const item = $(`.attendance-item[data-type="${type}"][data-id="${id}"]`);
+        if (item) {
+          const feedbackEl = item.querySelector('.attendance-feedback');
+          const toggleEl = item.querySelector('.attendance-toggle');
+          const presentBtn = item.querySelector('.toggle-present');
+          const absentBtn = item.querySelector('.toggle-absent');
+          
+          toggleEl.dataset.status = status;
+          toggleEl.classList.remove('present', 'absent');
+          toggleEl.classList.add(status.toLowerCase());
+          
+          if (presentBtn) {
+            presentBtn.classList.toggle('active', status === 'Present');
+            presentBtn.disabled = false;
+          }
+          if (absentBtn) {
+            absentBtn.classList.toggle('active', status === 'Absent');
+            absentBtn.disabled = false;
+          }
+          
+          if (feedbackEl) {
+            feedbackEl.innerHTML = '<span class="success-indicator">✓ Saved (UI only)</span>';
+            setTimeout(() => {
+              feedbackEl.style.display = 'none';
+            }, 2000);
+          }
+        }
+        return; // Don't save leader attendance to database in v1
+      }
+      
+      // Upsert attendance record (scouts only)
+      const attendanceRecord = {
+        scout_id: id,
+        meeting_id: selectedMeeting.id,
+        status: status,
+        points_earned: pointsEarned,
+        recorded_by: user.id,
+        leader_id: leaderRecord ? leaderRecord.id : null // Leader who took attendance
+      };
+      
+      // Use upsert with conflict resolution on unique constraint
+      const { error: attendanceError } = await supabase
+        .from('attendance')
+        .upsert(attendanceRecord, {
+          onConflict: 'scout_id,meeting_id'
+        });
+      
+      if (attendanceError) throw attendanceError;
+      
+      // Update scout's points_total
+      // Get current scout points and existing attendance points
+      const { data: scout } = await supabase
+        .from('scouts')
+        .select('points_total')
+        .eq('id', id)
+        .single();
+      
+      if (scout) {
+        // Calculate points difference
+        const existing = attendanceData.existingAttendance[`scout_${id}`];
+        const previousPoints = existing ? existing.points_earned : 0;
+        const pointsDifference = pointsEarned - previousPoints;
+        
+        // Update points_total (add difference, can be negative if changing from Present to Absent)
+        const newTotal = Math.max(0, (scout.points_total || 0) + pointsDifference);
+        
+        const { error: updateError } = await supabase
+          .from('scouts')
+          .update({ points_total: newTotal })
+          .eq('id', id);
+        
+        if (updateError) throw updateError;
+      }
+      
+      // Update UI
+      toggleEl.dataset.status = status;
+      toggleEl.classList.remove('present', 'absent');
+      toggleEl.classList.add(status.toLowerCase());
+      
+      if (presentBtn) {
+        presentBtn.classList.toggle('active', status === 'Present');
+        presentBtn.disabled = false;
+      }
+      if (absentBtn) {
+        absentBtn.classList.toggle('active', status === 'Absent');
+        absentBtn.disabled = false;
+      }
+      if (pointsInput) pointsInput.disabled = false;
+      
+      // Show success feedback
+      if (feedbackEl) {
+        feedbackEl.innerHTML = '<span class="success-indicator">✓ Saved</span>';
+        setTimeout(() => {
+          feedbackEl.style.display = 'none';
+        }, 2000);
+      }
+      
+      // Update existing attendance map
+      attendanceData.existingAttendance[`${type}_${id}`] = {
+        status: status,
+        points_earned: pointsEarned
+      };
+      
+    } catch (err) {
+      console.error('[Scout] Error saving attendance:', err);
+      
+      // Show error feedback
+      if (feedbackEl) {
+        feedbackEl.innerHTML = `<span class="error-indicator">✗ Failed. <button class="retry-btn" onclick="window.retrySaveAttendance('${type}', '${id}', '${status}', ${activityPoints})">Retry</button></span>`;
+        feedbackEl.style.display = 'block';
+      }
+      
+      if (presentBtn) presentBtn.disabled = false;
+      if (absentBtn) absentBtn.disabled = false;
+      if (pointsInput) pointsInput.disabled = false;
+    }
+  }
+  
+  // Make retry function available globally
+  window.retrySaveAttendance = saveAttendance;
   
   /* ── Kick off ─────────────────────────────────────────────── */
   initSplash();

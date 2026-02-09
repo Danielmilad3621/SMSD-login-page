@@ -1076,6 +1076,319 @@ img, svg { display: block; max-width: 100%; }
   font-size: var(--font-size-sm);
 }
 
+/* ── Attendance Screen ─────────────────────────────────────── */
+.meeting-selection-section {
+  margin-bottom: var(--space-xl);
+}
+
+.calendar-container {
+  margin-bottom: var(--space-lg);
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+}
+
+.calendar-header h3 {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin: 0;
+}
+
+.btn-calendar-prev,
+.btn-calendar-next {
+  background: transparent;
+  border: none;
+  font-size: var(--font-size-lg);
+  cursor: pointer;
+  padding: var(--space-xs);
+  color: var(--color-text);
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--space-xs);
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+  padding: var(--space-xs);
+}
+
+.calendar-day {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  position: relative;
+  transition: all var(--transition-fast);
+}
+
+.calendar-day.selectable:hover {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+}
+
+.calendar-day.has-meeting .meeting-indicator {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  color: var(--color-primary);
+  font-size: 8px;
+}
+
+.calendar-day.selected {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.meetings-list-container {
+  margin-top: var(--space-lg);
+}
+
+.subsection-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+.meetings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.meeting-list-item {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.meeting-list-item:hover {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+}
+
+.meeting-list-item.selected {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.meeting-item-date {
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+}
+
+.meeting-item-details {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.meeting-item-groups {
+  margin-top: var(--space-xs);
+}
+
+.selected-meeting-info {
+  background: var(--color-primary-bg);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-lg);
+}
+
+.meeting-details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+.detail-item {
+  font-size: var(--font-size-sm);
+}
+
+.attendance-section {
+  margin-bottom: var(--space-xl);
+}
+
+.section-title {
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  margin-bottom: var(--space-md);
+}
+
+.attendance-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.attendance-group {
+  margin-bottom: var(--space-lg);
+}
+
+.attendance-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.attendance-item {
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attendance-item-name {
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.saved-indicator {
+  font-size: var(--font-size-sm);
+  color: var(--color-success);
+  font-weight: normal;
+}
+
+.attendance-item-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attendance-toggle {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: var(--space-md);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: white;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  transition: all var(--transition-fast);
+  min-height: 44px; /* Mobile tap target */
+}
+
+.toggle-btn:hover:not(:disabled) {
+  background: var(--color-primary-bg);
+  border-color: var(--color-primary);
+}
+
+.toggle-btn.active {
+  background: var(--color-primary);
+  color: white;
+  border-color: var(--color-primary);
+}
+
+.toggle-present.active {
+  background: var(--color-success);
+  border-color: var(--color-success);
+}
+
+.toggle-absent.active {
+  background: var(--color-error);
+  border-color: var(--color-error);
+}
+
+.toggle-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.activity-points-input {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.activity-points-input label {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  min-width: 120px;
+}
+
+.points-input {
+  flex: 1;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-base);
+  min-height: 44px; /* Mobile tap target */
+}
+
+.points-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.attendance-feedback {
+  font-size: var(--font-size-sm);
+  min-height: 20px;
+}
+
+.loading-indicator {
+  color: var(--color-text-secondary);
+}
+
+.success-indicator {
+  color: var(--color-success);
+}
+
+.error-indicator {
+  color: var(--color-error);
+}
+
+.retry-btn {
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  margin-left: var(--space-xs);
+}
+
+.retry-btn:hover {
+  background: var(--color-primary-dark);
+}
+
+.card-actions-inline {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.btn-sm {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-sm);
+}
+
 /* ── Desktop / wider viewports ────────────────────────────── */
 @media (min-width: 480px) {
   body {

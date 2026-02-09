@@ -362,6 +362,81 @@
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 7 — Attendance Taking
+       ═══════════════════════════════════════════════════════ -->
+  <section id="attendance-screen" class="screen" aria-label="Take attendance">
+    <div class="screen-header">
+      <button type="button" class="btn-back" id="attendance-back" aria-label="Back to meetings">
+        ← Back
+      </button>
+      <h1 class="screen-title">Take Attendance</h1>
+    </div>
+
+    <div class="screen-content">
+      <!-- Meeting Selection -->
+      <div class="meeting-selection-section">
+        <h2 class="section-title">Select Meeting</h2>
+        
+        <!-- Calendar (simplified - month view) -->
+        <div class="calendar-container" id="attendance-calendar">
+          <!-- Calendar will be rendered here -->
+        </div>
+        
+        <!-- Meetings List -->
+        <div class="meetings-list-container">
+          <h3 class="subsection-title">Upcoming Meetings</h3>
+          <div class="meetings-list" id="attendance-meetings-list">
+            <!-- Meetings will be rendered here -->
+          </div>
+        </div>
+      </div>
+
+      <!-- Selected Meeting Info -->
+      <div class="selected-meeting-info" id="selected-meeting-info" style="display: none;">
+        <h2 class="section-title" id="selected-meeting-title"></h2>
+        <div class="meeting-details">
+          <div class="detail-item">
+            <strong>Date:</strong> <span id="selected-meeting-date"></span>
+          </div>
+          <div class="detail-item">
+            <strong>Location:</strong> <span id="selected-meeting-location"></span>
+          </div>
+          <div class="detail-item">
+            <strong>Groups:</strong> <span id="selected-meeting-groups"></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="attendance-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading attendance data...</p>
+      </div>
+
+      <!-- Scouts Section -->
+      <div class="attendance-section" id="scouts-attendance-section" style="display: none;">
+        <h2 class="section-title">Scouts</h2>
+        <div class="attendance-list" id="scouts-attendance-list">
+          <!-- Scouts will be rendered here -->
+        </div>
+      </div>
+
+      <!-- Leaders Section -->
+      <div class="attendance-section" id="leaders-attendance-section" style="display: none;">
+        <h2 class="section-title">Leaders</h2>
+        <div class="attendance-list" id="leaders-attendance-list">
+          <!-- Leaders will be rendered here -->
+        </div>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="attendance-empty" style="display: none;">
+        <p>Please select a meeting to take attendance.</p>
+      </div>
+    </div>
+  </section>
+
 </div><!-- /#app -->
 
 <!-- Toast -->
