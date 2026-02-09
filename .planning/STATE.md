@@ -3,17 +3,30 @@
 ## Current Position
 
 **Milestone:** v1 — Attendance Tracking System  
-**Status:** Phase 3 Complete, Ready for Phase 4  
-**Current Phase:** Phase 3 ✅ Complete  
-**Next Action:** Plan Phase 4
+**Status:** Phase 4 Complete, Core Attendance System Ready  
+**Current Phase:** Phase 4 ✅ Complete  
+**Next Action:** Phase 5 (Reporting & Export) or v1 completion review
 
 ## Progress
 
-**Phases Completed:** 3 / 6  
-**Requirements Completed:** 28 / 48  
-**Completion:** 58%
+**Phases Completed:** 4 / 6  
+**Requirements Completed:** 38 / 48  
+**Completion:** 79%
 
 ## Recent Work
+
+### 2025-02-09 — Phase 4 Complete
+- ✅ Phase 4: Attendance Taking
+  - Added Attendance screen with calendar and meetings list
+  - Built scouts and leaders attendance lists (filtered by meeting groups)
+  - Implemented Present/Absent toggle with auto-save
+  - Added activity points input with auto-save
+  - Implemented points calculation and immediate updates
+  - Added visual feedback (loading, success, error states)
+  - Implemented edit prevention for saved attendance
+  - Added permission checks and mobile optimization
+  - All 11 requirements completed
+  - Note: Leader attendance is UI-only in v1 (schema limitation)
 
 ### 2025-02-09 — Phase 3 Complete
 - ✅ Phase 3: Meeting Management
@@ -111,6 +124,13 @@ None currently.
 - YOLO mode: Auto-approve, execute without confirmation
 - Parallel execution: Independent plans run simultaneously
 - All planning artifacts committed to git
+
+## Known Limitations
+
+- **Leader Attendance**: Not persisted to database in v1 (UI-only)
+  - Schema change needed for full leader attendance tracking
+  - Current schema only supports scout attendance (unique on scout_id + meeting_id)
+  - `leader_id` field in attendance table tracks who took attendance, not who attended
 
 ---
 *Last updated: 2025-02-09*
