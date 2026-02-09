@@ -147,7 +147,7 @@
   </section>
 
   <!-- ═══════════════════════════════════════════════════════
-       SCREEN 3 — Logged-in state
+       SCREEN 3 — Logged-in state (Dashboard)
        ═══════════════════════════════════════════════════════ -->
   <section id="logged-in" class="screen" aria-label="Logged in">
     <!-- Green hero header -->
@@ -183,8 +183,135 @@
         <div class="welcome-badge">✓</div>
         <h1 class="title">Welcome!</h1>
         <p class="subtitle" id="welcome-email"></p>
-        <p class="helper-text" style="text-align:center; margin-bottom:var(--space-lg);">You're signed in. More features coming soon.</p>
+        
+        <!-- Navigation menu (only for Admin/Admin Leader) -->
+        <nav class="nav-menu" id="nav-menu" style="display: none;">
+          <button type="button" class="nav-btn" id="nav-scouts" data-screen="scouts">
+            Scouts
+          </button>
+          <button type="button" class="nav-btn" id="nav-leaders" data-screen="leaders">
+            Leaders
+          </button>
+        </nav>
+        
+        <p class="helper-text" style="text-align:center; margin-bottom:var(--space-lg);" id="dashboard-helper">You're signed in. More features coming soon.</p>
         <button type="button" class="btn btn-primary" id="btn-logout">Log Out</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 4 — Scouts Management
+       ═══════════════════════════════════════════════════════ -->
+  <section id="scouts-screen" class="screen" aria-label="Scouts management">
+    <div class="screen-header">
+      <button type="button" class="btn-back" id="scouts-back" aria-label="Back to dashboard">
+        ← Back
+      </button>
+      <h1 class="screen-title">Scouts</h1>
+    </div>
+
+    <div class="screen-content">
+      <!-- Search and Filter -->
+      <div class="search-filter-bar">
+        <input type="text" class="search-input" id="scouts-search" placeholder="Search scouts by name..." />
+        <div class="filter-group">
+          <label class="filter-checkbox">
+            <input type="checkbox" id="filter-group1" value="Group 1" checked />
+            <span>Group 1</span>
+          </label>
+          <label class="filter-checkbox">
+            <input type="checkbox" id="filter-group2" value="Group 2" checked />
+            <span>Group 2</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Add Scout Button (only Admin/Admin Leader) -->
+      <div class="action-bar" id="scouts-action-bar" style="display: none;">
+        <button type="button" class="btn btn-primary" id="btn-add-scout">
+          + Add Scout
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="scouts-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading scouts...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state" id="scouts-error" style="display: none;">
+        <p class="error-text"></p>
+        <button type="button" class="btn btn-secondary" id="scouts-retry">Retry</button>
+      </div>
+
+      <!-- Scouts List -->
+      <div class="list-container" id="scouts-list">
+        <!-- Groups will be rendered here -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="scouts-empty" style="display: none;">
+        <p>No scouts found.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 5 — Leaders Management
+       ═══════════════════════════════════════════════════════ -->
+  <section id="leaders-screen" class="screen" aria-label="Leaders management">
+    <div class="screen-header">
+      <button type="button" class="btn-back" id="leaders-back" aria-label="Back to dashboard">
+        ← Back
+      </button>
+      <h1 class="screen-title">Leaders</h1>
+    </div>
+
+    <div class="screen-content">
+      <!-- Search and Filter -->
+      <div class="search-filter-bar">
+        <input type="text" class="search-input" id="leaders-search" placeholder="Search leaders by name..." />
+        <div class="filter-group">
+          <label class="filter-checkbox">
+            <input type="checkbox" id="leaders-filter-group1" value="Group 1" checked />
+            <span>Group 1</span>
+          </label>
+          <label class="filter-checkbox">
+            <input type="checkbox" id="leaders-filter-group2" value="Group 2" checked />
+            <span>Group 2</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Add Leader Button (only Admin/Admin Leader) -->
+      <div class="action-bar" id="leaders-action-bar" style="display: none;">
+        <button type="button" class="btn btn-primary" id="btn-add-leader">
+          + Add Leader
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="leaders-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading leaders...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state" id="leaders-error" style="display: none;">
+        <p class="error-text"></p>
+        <button type="button" class="btn btn-secondary" id="leaders-retry">Retry</button>
+      </div>
+
+      <!-- Leaders List -->
+      <div class="list-container" id="leaders-list">
+        <!-- Groups will be rendered here -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="leaders-empty" style="display: none;">
+        <p>No leaders found.</p>
       </div>
     </div>
   </section>
@@ -193,6 +320,118 @@
 
 <!-- Toast -->
 <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<!-- Modal: Add Scout -->
+<div class="modal-overlay" id="modal-add-scout">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Add Scout</h2>
+      <button type="button" class="btn-close" id="close-add-scout">×</button>
+    </div>
+    <form id="form-add-scout">
+      <div id="add-scout-error-banner" class="error-banner" style="display: none;"></div>
+      
+      <div class="form-row">
+        <label for="add-scout-name">Name *</label>
+        <input type="text" id="add-scout-name" name="name" required />
+        <div class="form-error" id="add-scout-name-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-scout-email">Email *</label>
+        <input type="email" id="add-scout-email" name="email" required />
+        <div class="form-error" id="add-scout-email-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-scout-group">Scout Group *</label>
+        <select id="add-scout-group" name="scout_group" required>
+          <option value="">Select a group</option>
+          <option value="Group 1">Group 1</option>
+          <option value="Group 2">Group 2</option>
+        </select>
+        <div class="form-error" id="add-scout-group-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-scout-notes">Notes (optional)</label>
+        <textarea id="add-scout-notes" name="notes" rows="3"></textarea>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-scout-parent-contact">Parent Contact (optional)</label>
+        <input type="text" id="add-scout-parent-contact" name="parent_contact" />
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="cancel-add-scout">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add Scout</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Add Leader -->
+<div class="modal-overlay" id="modal-add-leader">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Add Leader</h2>
+      <button type="button" class="btn-close" id="close-add-leader">×</button>
+    </div>
+    <form id="form-add-leader">
+      <div id="add-leader-error-banner" class="error-banner" style="display: none;"></div>
+      
+      <div class="form-row">
+        <label for="add-leader-name">Name *</label>
+        <input type="text" id="add-leader-name" name="name" required />
+        <div class="form-error" id="add-leader-name-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-leader-email">Email *</label>
+        <input type="email" id="add-leader-email" name="email" required />
+        <div class="form-error" id="add-leader-email-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label>Scout Groups * (select at least one)</label>
+        <div class="checkbox-group-inline">
+          <label class="checkbox-inline">
+            <input type="checkbox" id="add-leader-group1" value="Group 1" />
+            <span>Group 1</span>
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" id="add-leader-group2" value="Group 2" />
+            <span>Group 2</span>
+          </label>
+        </div>
+        <div class="form-error" id="add-leader-groups-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-leader-role">Role *</label>
+        <select id="add-leader-role" name="role" required>
+          <option value="">Select a role</option>
+          <option value="Admin Leader">Admin Leader</option>
+          <option value="Leader">Leader</option>
+          <option value="Viewer">Viewer</option>
+        </select>
+        <div class="form-error" id="add-leader-role-error"></div>
+        <p class="helper-text" id="add-leader-role-help" style="display: none;">Only Admin can assign roles. This will default to "Leader".</p>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-leader-notes">Notes (optional)</label>
+        <textarea id="add-leader-notes" name="notes" rows="3"></textarea>
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="cancel-add-leader">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add Leader</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- App JS -->
 <script src="app.js"></script>
