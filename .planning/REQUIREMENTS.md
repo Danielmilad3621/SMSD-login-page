@@ -29,12 +29,12 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 
 ### Meeting Management
 
-- [ ] **MEET-01**: Admin/Admin Leader can create new meeting (date, location required)
-- [ ] **MEET-02**: Admin/Admin Leader can edit meeting details (before attendance taken)
-- [ ] **MEET-03**: Admin/Admin Leader can view list of all meetings (past and future)
-- [ ] **MEET-04**: System displays meetings in chronological order (newest first)
-- [ ] **MEET-05**: System prevents creating meetings with duplicate dates
-- [ ] **MEET-06**: Admin/Admin Leader can assign leaders to meeting (optional)
+- [x] **MEET-01**: Admin/Admin Leader can create new meeting (date, location required) — Phase 3
+- [x] **MEET-02**: Admin/Admin Leader can edit meeting details (before attendance taken) — Phase 3
+- [x] **MEET-03**: Admin/Admin Leader can view list of all meetings (past and future) — Phase 3
+- [x] **MEET-04**: System displays meetings in chronological order (upcoming first) — Phase 3
+- [x] **MEET-05**: System prevents creating meetings with duplicate dates — Phase 3
+- [x] **MEET-06**: Admin/Admin Leader can assign leaders to meeting (at least one required) — Phase 3
 
 ### Attendance Taking
 
