@@ -22,6 +22,7 @@
     loggedIn: $('#logged-in'),
     scouts:   $('#scouts-screen'),
     leaders:  $('#leaders-screen'),
+    meetings: $('#meetings-screen'),
   };
 
   const toast         = $('#toast');
@@ -265,6 +266,15 @@
   });
   
   $('#leaders-back')?.addEventListener('click', () => {
+    showScreen('loggedIn', 'right');
+  });
+  
+  $('#nav-meetings')?.addEventListener('click', () => {
+    showScreen('meetings', 'left');
+    loadMeetings();
+  });
+  
+  $('#meetings-back')?.addEventListener('click', () => {
     showScreen('loggedIn', 'right');
   });
   
@@ -917,6 +927,465 @@
     });
   }
   
+  /* ── Meetings Management ─────────────────────────────────────── */
+  let meetingsData = [];
+  
+  async function loadMeetings() {
+    const loadingEl = $('#meetings-loading');
+    const errorEl = $('#meetings-error');
+    const listEl = $('#meetings-list');
+    const emptyEl = $('#meetings-empty');
+    const actionBar = $('#meetings-action-bar');
+    
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'none';
+    
+    // Check permissions and cache
+    await checkCanManage();
+    
+    // Show/hide add button based on permissions
+    if (canManageCache) {
+      actionBar.style.display = 'block';
+    } else {
+      actionBar.style.display = 'none';
+    }
+    
+    try {
+      const { data, error } = await supabase
+        .from('meetings')
+        .select('*')
+        .order('date', { ascending: true });
+      
+      if (error) throw error;
+      
+      meetingsData = data || [];
+      renderMeetings();
+      
+      loadingEl.style.display = 'none';
+    } catch (err) {
+      console.error('[Scout] Error loading meetings:', err);
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'flex';
+      errorEl.querySelector('.error-text').textContent = 'Failed to load meetings. Please try again.';
+    }
+  }
+  
+  function groupMeetingsByWeek(meetings) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const upcoming = [];
+    const past = [];
+    
+    meetings.forEach(meeting => {
+      const meetingDate = new Date(meeting.date);
+      meetingDate.setHours(0, 0, 0, 0);
+      
+      if (meetingDate >= today) {
+        upcoming.push(meeting);
+      } else {
+        past.push(meeting);
+      }
+    });
+    
+    // Sort upcoming ascending (earliest first), past descending (most recent first)
+    upcoming.sort((a, b) => new Date(a.date) - new Date(b.date));
+    past.sort((a, b) => new Date(b.date) - new Date(a.date));
+    
+    const grouped = {
+      upcoming: groupByWeek(upcoming),
+      past: groupByWeek(past)
+    };
+    
+    return grouped;
+  }
+  
+  function groupByWeek(meetings) {
+    const weeks = {};
+    
+    meetings.forEach(meeting => {
+      const date = new Date(meeting.date);
+      const weekStart = getWeekStart(date);
+      const weekKey = weekStart.toISOString().split('T')[0];
+      
+      if (!weeks[weekKey]) {
+        weeks[weekKey] = {
+          start: weekStart,
+          meetings: []
+        };
+      }
+      
+      weeks[weekKey].meetings.push(meeting);
+    });
+    
+    return weeks;
+  }
+  
+  function getWeekStart(date) {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+    return new Date(d.setDate(diff));
+  }
+  
+  function getWeekLabel(weekStart, isPast = false) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    
+    const thisWeekStart = getWeekStart(today);
+    const nextWeekStart = new Date(thisWeekStart);
+    nextWeekStart.setDate(nextWeekStart.getDate() + 7);
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+    
+    if (!isPast) {
+      if (weekStart.getTime() === thisWeekStart.getTime()) {
+        return 'This Week';
+      } else if (weekStart.getTime() === nextWeekStart.getTime()) {
+        return 'Next Week';
+      }
+    } else {
+      if (weekStart.getTime() === lastWeekStart.getTime()) {
+        return 'Last Week';
+      }
+    }
+    
+    // Format: "Week of Jan 15, 2025"
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[weekStart.getMonth()];
+    const day = weekStart.getDate();
+    const year = weekStart.getFullYear();
+    return `Week of ${month} ${day}, ${year}`;
+  }
+  
+  function renderMeetings() {
+    const listEl = $('#meetings-list');
+    const emptyEl = $('#meetings-empty');
+    
+    if (meetingsData.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'flex';
+      return;
+    }
+    
+    emptyEl.style.display = 'none';
+    
+    const grouped = groupMeetingsByWeek(meetingsData);
+    let html = '';
+    
+    // Render upcoming meetings
+    const upcomingWeeks = Object.keys(grouped.upcoming).sort();
+    if (upcomingWeeks.length > 0) {
+      upcomingWeeks.forEach(weekKey => {
+        const week = grouped.upcoming[weekKey];
+        html += `<div class="group-section">`;
+        html += `<h2 class="group-header">${getWeekLabel(week.start, false)}</h2>`;
+        html += `<div class="cards-grid">`;
+        
+        week.meetings.forEach(meeting => {
+          html += renderMeetingCard(meeting);
+        });
+        
+        html += `</div></div>`;
+      });
+    }
+    
+    // Render past meetings
+    const pastWeeks = Object.keys(grouped.past).sort().reverse();
+    if (pastWeeks.length > 0) {
+      pastWeeks.forEach(weekKey => {
+        const week = grouped.past[weekKey];
+        html += `<div class="group-section">`;
+        html += `<h2 class="group-header">${getWeekLabel(week.start, true)}</h2>`;
+        html += `<div class="cards-grid">`;
+        
+        week.meetings.forEach(meeting => {
+          html += renderMeetingCard(meeting);
+        });
+        
+        html += `</div></div>`;
+      });
+    }
+    
+    listEl.innerHTML = html;
+    
+    // Attach event listeners and load details
+    attachMeetingEventListeners();
+  }
+  
+  function renderMeetingCard(meeting) {
+    // Format date
+    const date = new Date(meeting.date);
+    const dateFormatted = formatMeetingDate(date);
+    
+    // Format scout groups
+    const groups = (meeting.scout_groups || []).join(', ') || 'Not assigned';
+    
+    // Will be populated with leader names and attendance count
+    const leaderNames = 'Loading...';
+    const attendanceCount = 'Loading...';
+    
+    return `
+      <div class="participant-card meeting-card" data-meeting-id="${meeting.id}">
+        <div class="card-header">
+          <h3 class="card-name">${dateFormatted}</h3>
+          <div class="card-actions" style="display: ${canManageCache ? 'flex' : 'none'}">
+            <button class="btn-icon btn-edit-meeting" data-meeting-id="${meeting.id}" aria-label="Edit meeting">
+              ✏️
+            </button>
+          </div>
+        </div>
+        <div class="card-details">
+          <div class="card-detail">
+            <strong>Location:</strong> ${escapeHtml(meeting.location || 'Not specified')}
+          </div>
+          <div class="card-detail">
+            <strong>Groups:</strong> ${escapeHtml(groups)}
+          </div>
+          <div class="card-detail" id="meeting-${meeting.id}-leaders">
+            <strong>Assigned Leaders:</strong> ${leaderNames}
+          </div>
+          <div class="card-detail" id="meeting-${meeting.id}-attendance">
+            <strong>Attendance:</strong> ${attendanceCount}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  function formatMeetingDate(date) {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    const dayName = days[date.getDay()];
+    const month = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    
+    return `${dayName}, ${month} ${day}, ${year}`;
+  }
+  
+  async function attachMeetingEventListeners() {
+    // Load leader names and attendance counts for each meeting
+    for (const meeting of meetingsData) {
+      await loadMeetingDetails(meeting);
+    }
+    
+    // Attach edit button listeners
+    document.querySelectorAll('.btn-edit-meeting').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const meetingId = e.target.closest('.btn-edit-meeting').dataset.meetingId;
+        const meeting = meetingsData.find(m => m.id === meetingId);
+        if (meeting) {
+          editMeeting(meeting);
+        }
+      });
+    });
+  }
+  
+  async function loadMeetingDetails(meeting) {
+    // Load assigned leaders
+    if (meeting.assigned_leaders && meeting.assigned_leaders.length > 0) {
+      const { data: leaders } = await supabase
+        .from('leaders')
+        .select('name, email')
+        .in('id', meeting.assigned_leaders);
+      
+      if (leaders && leaders.length > 0) {
+        const leaderText = leaders.map(l => `${escapeHtml(l.name)} (${escapeHtml(l.email)})`).join(', ');
+        const leadersEl = $(`#meeting-${meeting.id}-leaders`);
+        if (leadersEl) {
+          leadersEl.innerHTML = `<strong>Assigned Leaders:</strong> ${leaderText}`;
+        }
+      } else {
+        const leadersEl = $(`#meeting-${meeting.id}-leaders`);
+        if (leadersEl) {
+          leadersEl.innerHTML = `<strong>Assigned Leaders:</strong> None assigned`;
+        }
+      }
+    } else {
+      const leadersEl = $(`#meeting-${meeting.id}-leaders`);
+      if (leadersEl) {
+        leadersEl.innerHTML = `<strong>Assigned Leaders:</strong> None assigned`;
+      }
+    }
+    
+    // Load attendance count
+    const { data: attendance } = await supabase
+      .from('attendance')
+      .select('status')
+      .eq('meeting_id', meeting.id);
+    
+    if (attendance) {
+      const present = attendance.filter(a => a.status === 'Present').length;
+      const absent = attendance.filter(a => a.status === 'Absent').length;
+      const total = attendance.length;
+      
+      let attendanceText;
+      if (total === 0) {
+        attendanceText = 'No attendance taken';
+      } else {
+        attendanceText = `${present} present, ${absent} absent (${total} total)`;
+      }
+      
+      const attendanceEl = $(`#meeting-${meeting.id}-attendance`);
+      if (attendanceEl) {
+        attendanceEl.innerHTML = `<strong>Attendance:</strong> ${attendanceText}`;
+      }
+    }
+  }
+  
+  /* ── Add Meeting Form ──────────────────────────────────────── */
+  $('#btn-add-meeting')?.addEventListener('click', async () => {
+    // Load leaders for multi-select
+    await loadLeadersForMeetingForm();
+    
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    $('#add-meeting-date').setAttribute('min', today);
+    
+    showModal('#modal-add-meeting');
+    resetAddMeetingForm();
+  });
+  
+  $('#close-add-meeting')?.addEventListener('click', () => {
+    hideModal('#modal-add-meeting');
+  });
+  
+  $('#cancel-add-meeting')?.addEventListener('click', () => {
+    hideModal('#modal-add-meeting');
+  });
+  
+  $('#modal-add-meeting')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-add-meeting') {
+      hideModal('#modal-add-meeting');
+    }
+  });
+  
+  async function loadLeadersForMeetingForm() {
+    try {
+      const { data: leaders } = await supabase
+        .from('leaders')
+        .select('id, name, email')
+        .eq('active', true)
+        .order('name');
+      
+      const selectEl = $('#add-meeting-leaders');
+      if (selectEl && leaders) {
+        selectEl.innerHTML = leaders.map(leader => 
+          `<option value="${leader.id}">${escapeHtml(leader.name)} (${escapeHtml(leader.email)})</option>`
+        ).join('');
+      }
+    } catch (err) {
+      console.error('[Scout] Error loading leaders for meeting form:', err);
+    }
+  }
+  
+  function resetAddMeetingForm() {
+    $('#form-add-meeting').reset();
+    clearFormErrors('add-meeting');
+    $('#add-meeting-error-banner').style.display = 'none';
+    
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    $('#add-meeting-date').setAttribute('min', today);
+  }
+  
+  $('#form-add-meeting')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearFormErrors('add-meeting');
+    
+    const date = $('#add-meeting-date').value;
+    const location = $('#add-meeting-location').value.trim();
+    const group1 = $('#add-meeting-group1').checked;
+    const group2 = $('#add-meeting-group2').checked;
+    const leadersSelect = $('#add-meeting-leaders');
+    const notes = $('#add-meeting-notes').value.trim();
+    
+    const scoutGroups = [];
+    if (group1) scoutGroups.push('Group 1');
+    if (group2) scoutGroups.push('Group 2');
+    
+    const selectedLeaders = Array.from(leadersSelect.selectedOptions).map(opt => opt.value);
+    
+    // Validation
+    let hasErrors = false;
+    
+    if (!date) {
+      showFieldError('add-meeting-date', 'Date is required');
+      hasErrors = true;
+    } else {
+      const selectedDate = new Date(date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      selectedDate.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        showFieldError('add-meeting-date', 'Date must be in the future');
+        hasErrors = true;
+      } else {
+        // Check for duplicate date
+        const { data: existing } = await supabase
+          .from('meetings')
+          .select('id')
+          .eq('date', date)
+          .maybeSingle();
+        
+        if (existing) {
+          showFieldError('add-meeting-date', 'A meeting already exists on this date');
+          hasErrors = true;
+        }
+      }
+    }
+    
+    if (!location) {
+      showFieldError('add-meeting-location', 'Location is required');
+      hasErrors = true;
+    }
+    
+    if (scoutGroups.length === 0) {
+      showFieldError('add-meeting-groups', 'Please select at least one scout group');
+      hasErrors = true;
+    }
+    
+    if (selectedLeaders.length === 0) {
+      showFieldError('add-meeting-leaders', 'Please select at least one leader');
+      hasErrors = true;
+    }
+    
+    if (hasErrors) return;
+    
+    // Submit
+    try {
+      const { data, error } = await supabase
+        .from('meetings')
+        .insert({
+          date,
+          location,
+          scout_groups: scoutGroups,
+          assigned_leaders: selectedLeaders,
+          notes: notes || null
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      hideModal('#modal-add-meeting');
+      showToast('✅ Meeting added successfully');
+      await loadMeetings();
+    } catch (err) {
+      console.error('[Scout] Error adding meeting:', err);
+      $('#add-meeting-error-banner').textContent = err.message || 'Failed to add meeting. Please try again.';
+      $('#add-meeting-error-banner').style.display = 'block';
+    }
+  });
+  
   /* ── Edit Scout (Inline) ───────────────────────────────────── */
   async function editScout(scout) {
     const card = document.querySelector(`[data-scout-id="${scout.id}"]`);
@@ -1188,6 +1657,204 @@
   function clearEditLeaderErrors(leaderId) {
     ['name', 'email', 'groups', 'role'].forEach(field => {
       const errorEl = $(`#edit-leader-${leaderId}-${field}-error`);
+      if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.style.display = 'none';
+      }
+    });
+  }
+  
+  /* ── Edit Meeting (Inline) ────────────────────────────────── */
+  async function editMeeting(meeting) {
+    // Check if attendance has been taken
+    const { data: attendance } = await supabase
+      .from('attendance')
+      .select('id')
+      .eq('meeting_id', meeting.id)
+      .limit(1);
+    
+    if (attendance && attendance.length > 0) {
+      showToast('Cannot edit meeting - attendance has already been taken', 4000);
+      return;
+    }
+    
+    const card = document.querySelector(`[data-meeting-id="${meeting.id}"]`);
+    if (!card) return;
+    
+    card.classList.add('editing');
+    
+    // Load leaders for multi-select
+    const { data: leaders } = await supabase
+      .from('leaders')
+      .select('id, name, email')
+      .eq('active', true)
+      .order('name');
+    
+    const groups = meeting.scout_groups || [];
+    const group1Checked = groups.includes('Group 1');
+    const group2Checked = groups.includes('Group 2');
+    const assignedLeaders = meeting.assigned_leaders || [];
+    
+    card.innerHTML = `
+      <form class="card-form" data-meeting-id="${meeting.id}">
+        <div class="form-row">
+          <label>Date *</label>
+          <input type="date" name="date" value="${meeting.date}" required />
+          <div class="form-error" id="edit-meeting-${meeting.id}-date-error"></div>
+        </div>
+        <div class="form-row">
+          <label>Location *</label>
+          <input type="text" name="location" value="${escapeHtml(meeting.location || '')}" required />
+          <div class="form-error" id="edit-meeting-${meeting.id}-location-error"></div>
+        </div>
+        <div class="form-row">
+          <label>Scout Groups *</label>
+          <div class="checkbox-group-inline">
+            <label class="checkbox-inline">
+              <input type="checkbox" name="group1" value="Group 1" ${group1Checked ? 'checked' : ''} />
+              <span>Group 1</span>
+            </label>
+            <label class="checkbox-inline">
+              <input type="checkbox" name="group2" value="Group 2" ${group2Checked ? 'checked' : ''} />
+              <span>Group 2</span>
+            </label>
+          </div>
+          <div class="form-error" id="edit-meeting-${meeting.id}-groups-error"></div>
+        </div>
+        <div class="form-row">
+          <label>Assigned Leaders *</label>
+          <select name="leaders" multiple size="5" required id="edit-meeting-${meeting.id}-leaders">
+            ${leaders ? leaders.map(leader => 
+              `<option value="${leader.id}" ${assignedLeaders.includes(leader.id) ? 'selected' : ''}>${escapeHtml(leader.name)} (${escapeHtml(leader.email)})</option>`
+            ).join('') : ''}
+          </select>
+          <div class="form-error" id="edit-meeting-${meeting.id}-leaders-error"></div>
+          <p class="helper-text">Hold Ctrl/Cmd to select multiple leaders</p>
+        </div>
+        <div class="form-row">
+          <label>Notes (optional)</label>
+          <textarea name="notes" rows="3">${escapeHtml(meeting.notes || '')}</textarea>
+        </div>
+        <div class="form-actions">
+          <button type="button" class="btn btn-secondary btn-sm btn-cancel-edit-meeting" data-meeting-id="${meeting.id}">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save</button>
+        </div>
+      </form>
+    `;
+    
+    // Set minimum date to today
+    const today = new Date().toISOString().split('T')[0];
+    card.querySelector('input[type="date"]').setAttribute('min', today);
+    
+    // Cancel handler
+    card.querySelector('.btn-cancel-edit-meeting')?.addEventListener('click', () => {
+      card.classList.remove('editing');
+      renderMeetings();
+    });
+    
+    // Submit handler
+    card.querySelector('form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const formData = new FormData(form);
+      
+      const date = formData.get('date');
+      const location = formData.get('location').trim();
+      const group1 = formData.get('group1') === 'Group 1';
+      const group2 = formData.get('group2') === 'Group 2';
+      const leadersSelect = form.querySelector('select[name="leaders"]');
+      const notes = formData.get('notes').trim();
+      
+      const scoutGroups = [];
+      if (group1) scoutGroups.push('Group 1');
+      if (group2) scoutGroups.push('Group 2');
+      
+      const selectedLeaders = Array.from(leadersSelect.selectedOptions).map(opt => opt.value);
+      
+      // Validation
+      let hasErrors = false;
+      clearEditMeetingErrors(meeting.id);
+      
+      if (!date) {
+        showEditMeetingError(meeting.id, 'date', 'Date is required');
+        hasErrors = true;
+      } else {
+        const selectedDate = new Date(date);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        selectedDate.setHours(0, 0, 0, 0);
+        
+        if (selectedDate < today) {
+          showEditMeetingError(meeting.id, 'date', 'Date must be in the future');
+          hasErrors = true;
+        } else {
+          // Check for duplicate date (exclude current meeting)
+          const { data: existing } = await supabase
+            .from('meetings')
+            .select('id')
+            .eq('date', date)
+            .neq('id', meeting.id)
+            .maybeSingle();
+          
+          if (existing) {
+            showEditMeetingError(meeting.id, 'date', 'A meeting already exists on this date');
+            hasErrors = true;
+          }
+        }
+      }
+      
+      if (!location) {
+        showEditMeetingError(meeting.id, 'location', 'Location is required');
+        hasErrors = true;
+      }
+      
+      if (scoutGroups.length === 0) {
+        showEditMeetingError(meeting.id, 'groups', 'Please select at least one scout group');
+        hasErrors = true;
+      }
+      
+      if (selectedLeaders.length === 0) {
+        showEditMeetingError(meeting.id, 'leaders', 'Please select at least one leader');
+        hasErrors = true;
+      }
+      
+      if (hasErrors) return;
+      
+      // Update
+      try {
+        const { error } = await supabase
+          .from('meetings')
+          .update({
+            date,
+            location,
+            scout_groups: scoutGroups,
+            assigned_leaders: selectedLeaders,
+            notes: notes || null
+          })
+          .eq('id', meeting.id);
+        
+        if (error) throw error;
+        
+        showToast('✅ Meeting updated successfully');
+        await loadMeetings();
+      } catch (err) {
+        console.error('[Scout] Error updating meeting:', err);
+        showToast('Failed to update meeting. Please try again.', 4000);
+      }
+    });
+  }
+  
+  function showEditMeetingError(meetingId, field, message) {
+    const errorEl = $(`#edit-meeting-${meetingId}-${field}-error`);
+    if (errorEl) {
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
+  }
+  
+  function clearEditMeetingErrors(meetingId) {
+    ['date', 'location', 'groups', 'leaders'].forEach(field => {
+      const errorEl = $(`#edit-meeting-${meetingId}-${field}-error`);
       if (errorEl) {
         errorEl.textContent = '';
         errorEl.style.display = 'none';

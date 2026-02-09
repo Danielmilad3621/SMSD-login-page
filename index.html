@@ -192,6 +192,9 @@
           <button type="button" class="nav-btn" id="nav-leaders" data-screen="leaders">
             Leaders
           </button>
+          <button type="button" class="nav-btn" id="nav-meetings" data-screen="meetings">
+            Meetings
+          </button>
         </nav>
         
         <p class="helper-text" style="text-align:center; margin-bottom:var(--space-lg);" id="dashboard-helper">You're signed in. More features coming soon.</p>
@@ -316,6 +319,49 @@
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 6 — Meetings Management
+       ═══════════════════════════════════════════════════════ -->
+  <section id="meetings-screen" class="screen" aria-label="Meetings management">
+    <div class="screen-header">
+      <button type="button" class="btn-back" id="meetings-back" aria-label="Back to dashboard">
+        ← Back
+      </button>
+      <h1 class="screen-title">Meetings</h1>
+    </div>
+
+    <div class="screen-content">
+      <!-- Add Meeting Button (only Admin/Admin Leader) -->
+      <div class="action-bar" id="meetings-action-bar" style="display: none;">
+        <button type="button" class="btn btn-primary" id="btn-add-meeting">
+          + Add Meeting
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="meetings-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading meetings...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state" id="meetings-error" style="display: none;">
+        <p class="error-text"></p>
+        <button type="button" class="btn btn-secondary" id="meetings-retry">Retry</button>
+      </div>
+
+      <!-- Meetings List -->
+      <div class="list-container" id="meetings-list">
+        <!-- Week groups will be rendered here -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="meetings-empty" style="display: none;">
+        <p>No meetings found.</p>
+      </div>
+    </div>
+  </section>
+
 </div><!-- /#app -->
 
 <!-- Toast -->
@@ -366,6 +412,65 @@
       <div class="form-actions">
         <button type="button" class="btn btn-secondary btn-sm" id="cancel-add-scout">Cancel</button>
         <button type="submit" class="btn btn-primary btn-sm">Add Scout</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Add Meeting -->
+<div class="modal-overlay" id="modal-add-meeting">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Add Meeting</h2>
+      <button type="button" class="btn-close" id="close-add-meeting">×</button>
+    </div>
+    <form id="form-add-meeting">
+      <div id="add-meeting-error-banner" class="error-banner" style="display: none;"></div>
+      
+      <div class="form-row">
+        <label for="add-meeting-date">Date *</label>
+        <input type="date" id="add-meeting-date" name="date" required />
+        <div class="form-error" id="add-meeting-date-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-meeting-location">Location *</label>
+        <input type="text" id="add-meeting-location" name="location" required />
+        <div class="form-error" id="add-meeting-location-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label>Scout Groups * (select at least one)</label>
+        <div class="checkbox-group-inline">
+          <label class="checkbox-inline">
+            <input type="checkbox" id="add-meeting-group1" value="Group 1" />
+            <span>Group 1</span>
+          </label>
+          <label class="checkbox-inline">
+            <input type="checkbox" id="add-meeting-group2" value="Group 2" />
+            <span>Group 2</span>
+          </label>
+        </div>
+        <div class="form-error" id="add-meeting-groups-error"></div>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-meeting-leaders">Assigned Leaders * (select at least one)</label>
+        <select id="add-meeting-leaders" name="leaders" multiple size="5" required>
+          <!-- Will be populated with leaders -->
+        </select>
+        <div class="form-error" id="add-meeting-leaders-error"></div>
+        <p class="helper-text">Hold Ctrl/Cmd to select multiple leaders</p>
+      </div>
+      
+      <div class="form-row">
+        <label for="add-meeting-notes">Notes (optional)</label>
+        <textarea id="add-meeting-notes" name="notes" rows="3"></textarea>
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary btn-sm" id="cancel-add-meeting">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Add Meeting</button>
       </div>
     </form>
   </div>
