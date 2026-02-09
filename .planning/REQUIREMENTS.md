@@ -74,13 +74,13 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 
 ### Data Management
 
-- [ ] **DATA-01**: Scouts table in Supabase (id, name, email, points_total, created_at, updated_at)
-- [ ] **DATA-02**: Meetings table in Supabase (id, date, location, type, assigned_leaders, created_at, updated_at)
-- [ ] **DATA-03**: Attendance table in Supabase (id, scout_id, meeting_id, status, points_earned, recorded_by, recorded_at)
-- [ ] **DATA-04**: Roles table or field in Supabase (user_id, role)
-- [ ] **DATA-05**: Database enforces unique constraint on (scout_id, meeting_id) in attendance table
-- [ ] **DATA-06**: Database uses foreign keys with appropriate CASCADE rules
-- [ ] **DATA-07**: All tables have created_at and updated_at timestamps
+- [x] **DATA-01**: Scouts table in Supabase (id, name, email, points_total, created_at, updated_at) — Phase 1
+- [x] **DATA-02**: Meetings table in Supabase (id, date, location, type, assigned_leaders, created_at, updated_at) — Phase 1
+- [x] **DATA-03**: Attendance table in Supabase (id, scout_id, meeting_id, status, points_earned, recorded_by, recorded_at) — Phase 1
+- [x] **DATA-04**: Roles table or field in Supabase (user_id, role) — Phase 1
+- [x] **DATA-05**: Database enforces unique constraint on (scout_id, meeting_id) in attendance table — Phase 1
+- [x] **DATA-06**: Database uses foreign keys with appropriate CASCADE rules — Phase 1
+- [x] **DATA-07**: All tables have created_at and updated_at timestamps — Phase 1
 
 ## v2 Requirements (Deferred)
 
