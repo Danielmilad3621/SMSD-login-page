@@ -7,13 +7,13 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 
 ### Permission System
 
-- [ ] **PERM-01**: System supports four role types: Admin, Admin Leader, Leader, Viewer
-- [ ] **PERM-02**: User role stored in Supabase (extend auth.users table or separate roles table)
+- [x] **PERM-01**: System supports four role types: Admin, Admin Leader, Leader, Viewer — Phase 1
+- [x] **PERM-02**: User role stored in Supabase (extend auth.users table or separate roles table) — Phase 1
 - [ ] **PERM-03**: Admin has full system access (all features)
 - [ ] **PERM-04**: Admin Leaders (2-3 people) can create meetings and take attendance
 - [ ] **PERM-05**: Leaders can take attendance for scouts and other leaders
 - [ ] **PERM-06**: Viewers have read-only access (can view but not edit)
-- [ ] **PERM-07**: Permission checks enforced server-side via Supabase RLS policies
+- [x] **PERM-07**: Permission checks enforced server-side via Supabase RLS policies — Phase 1
 - [ ] **PERM-08**: UI hides features user doesn't have permission to access
 
 ### Participant Management
