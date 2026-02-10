@@ -263,10 +263,19 @@
       }, 2200);
     }
 
-    setTimeout(async () => {
+    // Use Promise.race to prevent hanging on slow connections
+    const sessionCheck = async () => {
       try {
-        // Check for an existing Supabase session
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Check for an existing Supabase session with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Session check timeout')), 5000)
+        );
+        
+        const { data: { session }, error } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]);
 
         if (error) {
           console.error('[Scout] Error checking session:', error);
@@ -281,10 +290,22 @@
         }
       } catch (err) {
         console.error('[Scout] Error in initSplash:', err);
-        // Fallback to login screen on any error
+        // Fallback to login screen on any error (including timeout)
         showScreen('login', 'left');
       }
-    }, logo ? 3200 : 100); // Shorter delay if no logo animation
+    };
+
+    // Start session check immediately, but delay screen transition
+    const animationDelay = logo ? 3200 : 100;
+    setTimeout(sessionCheck, animationDelay);
+    
+    // Safety timeout: if nothing happens after 10 seconds, show login
+    setTimeout(() => {
+      if (currentScreen === 'splash') {
+        console.warn('[Scout] Splash screen timeout, forcing login');
+        showScreen('login', 'left');
+      }
+    }, 10000);
   }
 
   /* ── Listen for auth state changes (handles OAuth redirect) ── */
@@ -961,7 +982,10 @@
         .select()
         .single();
       
-      if (leaderError) throw leaderError;
+      if (leaderError) {
+        hideModal('#modal-add-leader');
+        throw leaderError;
+      }
       
       // Create role if specified and user is admin
       // Note: Roles require user_id from auth.users
@@ -980,30 +1004,47 @@
             // For now, show helpful message
             if (roleError.message && roleError.message.includes('function') && roleError.message.includes('does not exist')) {
               console.warn('[Scout] create_leader_role function not found. Creating leader without role.');
-              showToast('✅ Leader added. Note: Please assign role manually after user signs in.', 5000);
+              // Hide modal first so toast is visible
+              hideModal('#modal-add-leader');
+              await loadLeaders();
+              showToast('✅ Leader added. Note: Please assign role manually after user signs in.', 6000);
+            } else if (roleError.message && roleError.message.includes('does not exist')) {
+              // User doesn't exist in auth.users
+              console.warn('[Scout] Could not create role - user not found:', roleError.message);
+              // Hide modal first so toast is visible
+              hideModal('#modal-add-leader');
+              await loadLeaders();
+              showToast('✅ Leader added. Role requires user to sign in first. Role will be assigned automatically when they sign in.', 7000);
             } else {
-              // Other error - user might not exist
+              // Other error
               console.warn('[Scout] Could not create role:', roleError.message);
-              showToast('✅ Leader added. Role assignment requires user to sign in first.', 5000);
+              // Hide modal first so toast is visible
+              hideModal('#modal-add-leader');
+              await loadLeaders();
+              showToast('✅ Leader added. Role assignment failed. Please assign role manually after user signs in.', 6000);
             }
           } else {
             // Role created successfully
-            showToast('✅ Leader and role added successfully');
+            hideModal('#modal-add-leader');
+            await loadLeaders();
+            showToast('✅ Leader and role added successfully', 4000);
           }
         } catch (roleErr) {
           console.error('[Scout] Error creating role:', roleErr);
           // Leader was created, but role wasn't - show helpful message
-          showToast('✅ Leader added. Role will be assigned when user signs in.', 5000);
+          hideModal('#modal-add-leader');
+          await loadLeaders();
+          showToast('✅ Leader added. Role will be assigned when user signs in.', 6000);
         }
       } else {
         // No role specified or not admin - just create leader
-        showToast('✅ Leader added successfully');
+        hideModal('#modal-add-leader');
+        await loadLeaders();
+        showToast('✅ Leader added successfully', 4000);
       }
-      
-      hideModal('#modal-add-leader');
-      await loadLeaders();
     } catch (err) {
       console.error('[Scout] Error adding leader:', err);
+      // Don't hide modal on error - show error in form
       $('#add-leader-error-banner').textContent = err.message || 'Failed to add leader. Please try again.';
       $('#add-leader-error-banner').style.display = 'block';
     }
@@ -1470,16 +1511,31 @@
         showFieldError('add-meeting-date', 'Date must be in the future');
         hasErrors = true;
       } else {
-        // Check for duplicate date
-        const { data: existing } = await supabase
-          .from('meetings')
-          .select('id')
-          .eq('date', date)
-          .maybeSingle();
-        
-        if (existing) {
-          showFieldError('add-meeting-date', 'A meeting already exists on this date');
-          hasErrors = true;
+        // Check for duplicate date with timeout to prevent hanging
+        try {
+          const duplicateCheckPromise = supabase
+            .from('meetings')
+            .select('id')
+            .eq('date', date)
+            .maybeSingle();
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Duplicate check timeout')), 5000)
+          );
+          
+          const { data: existing } = await Promise.race([
+            duplicateCheckPromise,
+            timeoutPromise
+          ]);
+          
+          if (existing) {
+            showFieldError('add-meeting-date', 'A meeting already exists on this date');
+            hasErrors = true;
+          }
+        } catch (dupErr) {
+          console.warn('[Scout] Error checking duplicate date:', dupErr);
+          // Continue with submission - duplicate check failed but don't block
+          // Database constraint will catch duplicates anyway
         }
       }
     }
@@ -1520,20 +1576,30 @@
       
       if (error) throw error;
       
-      // Reset form and hide modal
+      // Reset form and hide modal first so toast is visible
       resetAddMeetingForm();
       hideModal('#modal-add-meeting');
       
       // Reload meetings to refresh the list (this will repopulate meetingsData)
       await loadMeetings();
       
-      showToast('✅ Meeting added successfully');
+      showToast('✅ Meeting added successfully', 4000);
     } catch (err) {
       console.error('[Scout] Error adding meeting:', err);
       // Clear cache on error too to prevent stale data
       meetingsData = [];
-      $('#add-meeting-error-banner').textContent = err.message || 'Failed to add meeting. Please try again.';
-      $('#add-meeting-error-banner').style.display = 'block';
+      
+      // Show error message - ensure it's visible
+      const errorBanner = $('#add-meeting-error-banner');
+      if (errorBanner) {
+        errorBanner.textContent = err.message || 'Failed to add meeting. Please try again.';
+        errorBanner.style.display = 'block';
+        // Scroll to top of form to show error
+        errorBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      
+      // Also show toast for visibility
+      showToast(`❌ ${err.message || 'Failed to add meeting'}`, 5000);
     }
   });
   

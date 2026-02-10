@@ -546,8 +546,10 @@ img, svg { display: block; max-width: 100%; }
   white-space: nowrap;
   opacity: 0;
   transition: transform var(--transition-base), opacity var(--transition-base);
-  z-index: 100;
+  z-index: 10000;
   pointer-events: none;
+  max-width: 90vw;
+  text-align: center;
 }
 
 .toast.visible {
