@@ -1836,18 +1836,38 @@
         if (leaderError) throw leaderError;
         
         // Update role if changed and user is Admin
-        if (isAdminUser && role && leader.user_id) {
-          const { error: roleError } = await supabase
-            .from('roles')
-            .upsert({ user_id: leader.user_id, role }, { onConflict: 'user_id' });
-          
-          if (roleError) {
-            console.error('[Scout] Error updating role:', roleError);
-            // Don't fail the whole update if role update fails
+        // Use create_leader_with_role function to link user and assign role
+        if (isAdminUser && role) {
+          try {
+            // Use the function that links leader to user AND assigns role
+            const { data: roleData, error: roleError } = await supabase.rpc('create_leader_with_role', {
+              leader_id: leader.id,
+              leader_email: email,  // Use the updated email from form
+              role_name: role
+            });
+            
+            if (roleError) {
+              // If user doesn't exist, show helpful message but don't fail
+              if (roleError.message && roleError.message.includes('does not exist')) {
+                console.warn('[Scout] Could not assign role - user not found:', roleError.message);
+                showToast('✅ Leader updated. Role requires user to sign in first.', 6000);
+              } else {
+                console.error('[Scout] Error assigning role:', roleError);
+                showToast('✅ Leader updated. Role assignment failed. Please try again.', 6000);
+              }
+            } else {
+              // Role assigned successfully
+              showToast('✅ Leader and role updated successfully', 4000);
+            }
+          } catch (roleErr) {
+            console.error('[Scout] Error assigning role:', roleErr);
+            showToast('✅ Leader updated. Role assignment failed. Please try again.', 6000);
           }
+        } else {
+          // No role change or not admin
+          showToast('✅ Leader updated successfully', 4000);
         }
         
-        showToast('✅ Leader updated successfully');
         await loadLeaders();
       } catch (err) {
         console.error('[Scout] Error updating leader:', err);
