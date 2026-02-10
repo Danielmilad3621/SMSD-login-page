@@ -3408,23 +3408,50 @@
   
   /* ── Kick off ─────────────────────────────────────────────── */
   // Wait for DOM to be fully ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+  function startApp() {
+    try {
       initSplash();
-    });
-  } else {
-    // DOM already loaded
-    initSplash();
+    } catch (err) {
+      console.error('[Scout] Fatal error in startApp:', err);
+      // Emergency: show login screen directly
+      if (screens.login) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        screens.login.classList.add('active');
+        currentScreen = 'login';
+      }
+    }
   }
   
-  // Emergency fallback: if page is still on splash after 10 seconds, force login
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', startApp);
+  } else {
+    // DOM already loaded
+    startApp();
+  }
+  
+  // Emergency fallback: if page is still on splash after 8 seconds, force login
   setTimeout(() => {
     if (currentScreen === 'splash' && screens.login) {
-      console.error('[Scout] Emergency: Forcing login screen after 10s');
-      screens.splash?.classList.remove('active');
-      screens.login.classList.add('active');
-      currentScreen = 'login';
+      console.error('[Scout] Emergency: Forcing login screen after 8s');
+      try {
+        screens.splash?.classList.remove('active');
+        screens.login.classList.add('active');
+        currentScreen = 'login';
+      } catch (err) {
+        console.error('[Scout] Emergency fallback also failed:', err);
+        // Last resort: direct DOM manipulation
+        const splashEl = document.getElementById('splash');
+        const loginEl = document.getElementById('login');
+        if (splashEl && loginEl) {
+          splashEl.classList.remove('active');
+          loginEl.classList.add('active');
+          currentScreen = 'login';
+        }
+      }
     }
-  }, 10000);
+  }, 8000);
+  
+  // Log diagnostic info
+  console.log('[Scout] App initialized. Supabase:', !!window.supabase, 'Screens:', Object.keys(screens).filter(k => screens[k] !== null));
 
 })();
