@@ -25,6 +25,15 @@
     meetings: $('#meetings-screen'),
     attendance: $('#attendance-screen'),
   };
+  
+  // Validate critical screens exist
+  if (!screens.splash || !screens.login) {
+    console.error('[Scout] Critical: Required screen elements not found');
+    // Try to show login screen if it exists
+    if (screens.login) {
+      screens.login.classList.add('active');
+    }
+  }
 
   const toast         = $('#toast');
   const btnGoogle     = $('#btn-google');
@@ -42,17 +51,36 @@
   /* ── Screen transition ────────────────────────────────────── */
   function showScreen(target, direction = 'left') {
     if (target === currentScreen) return;
+    
+    // Safety check: ensure target screen exists
+    if (!screens[target]) {
+      console.error(`[Scout] Screen "${target}" not found`);
+      // Try to show login as fallback
+      if (screens.login) {
+        target = 'login';
+      } else {
+        return;
+      }
+    }
 
     const outgoing = screens[currentScreen];
     const incoming = screens[target];
+    
+    // Additional safety checks
+    if (!incoming) {
+      console.error(`[Scout] Cannot transition to screen "${target}"`);
+      return;
+    }
 
     incoming.classList.remove('slide-left', 'slide-right');
     incoming.classList.add(direction === 'left' ? 'slide-right' : 'slide-left');
 
     void incoming.offsetWidth;
 
-    outgoing.classList.remove('active');
-    outgoing.classList.add(direction === 'left' ? 'slide-left' : 'slide-right');
+    if (outgoing) {
+      outgoing.classList.remove('active');
+      outgoing.classList.add(direction === 'left' ? 'slide-left' : 'slide-right');
+    }
 
     incoming.classList.remove('slide-left', 'slide-right');
     incoming.classList.add('active');
@@ -217,22 +245,46 @@
 
   /* ── Splash → next screen auto-transition ──────────────────── */
   function initSplash() {
+    // Safety check: if splash screen doesn't exist, go straight to login
+    if (!screens.splash) {
+      console.warn('[Scout] Splash screen not found, showing login');
+      showScreen('login', 'left');
+      return;
+    }
+    
     const logo = screens.splash.querySelector('.splash-logo');
-
-    setTimeout(() => {
-      logo.classList.add('idle');
-    }, 2200);
+    
+    // If logo doesn't exist, skip animation and go straight to session check
+    if (logo) {
+      setTimeout(() => {
+        if (logo) {
+          logo.classList.add('idle');
+        }
+      }, 2200);
+    }
 
     setTimeout(async () => {
-      // Check for an existing Supabase session
-      const { data: { session } } = await supabase.auth.getSession();
+      try {
+        // Check for an existing Supabase session
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-      if (session && session.user) {
-        await handleAuthUser(session.user);
-      } else {
+        if (error) {
+          console.error('[Scout] Error checking session:', error);
+          showScreen('login', 'left');
+          return;
+        }
+
+        if (session && session.user) {
+          await handleAuthUser(session.user);
+        } else {
+          showScreen('login', 'left');
+        }
+      } catch (err) {
+        console.error('[Scout] Error in initSplash:', err);
+        // Fallback to login screen on any error
         showScreen('login', 'left');
       }
-    }, 3200);
+    }, logo ? 3200 : 100); // Shorter delay if no logo animation
   }
 
   /* ── Listen for auth state changes (handles OAuth redirect) ── */
@@ -893,8 +945,10 @@
     
     // Submit
     try {
-      // First, we need to get or create the user in auth.users
-      // For now, we'll create the leader without user_id (can be linked later)
+      // Check if current user is admin (only admin can assign roles)
+      const currentUserIsAdmin = await isAdmin();
+      
+      // Create leader first
       const { data: leaderData, error: leaderError } = await supabase
         .from('leaders')
         .insert({
@@ -909,13 +963,44 @@
       
       if (leaderError) throw leaderError;
       
-      // If we have a user_id (from email lookup), create role
-      // For now, we'll need to handle this differently
-      // The leader needs to be linked to a user account first
-      // This is a limitation - we'll need to handle user creation separately
+      // Create role if specified and user is admin
+      // Note: Roles require user_id from auth.users
+      // We need to find the user by email to get their user_id
+      if (currentUserIsAdmin && role) {
+        // Try to create role using a database function
+        // The function will find user by email and create role
+        try {
+          const { data: roleData, error: roleError } = await supabase.rpc('create_leader_role', {
+            leader_email: email,
+            role_name: role
+          });
+          
+          if (roleError) {
+            // If RPC function doesn't exist, we need to create it
+            // For now, show helpful message
+            if (roleError.message && roleError.message.includes('function') && roleError.message.includes('does not exist')) {
+              console.warn('[Scout] create_leader_role function not found. Creating leader without role.');
+              showToast('✅ Leader added. Note: Please assign role manually after user signs in.', 5000);
+            } else {
+              // Other error - user might not exist
+              console.warn('[Scout] Could not create role:', roleError.message);
+              showToast('✅ Leader added. Role assignment requires user to sign in first.', 5000);
+            }
+          } else {
+            // Role created successfully
+            showToast('✅ Leader and role added successfully');
+          }
+        } catch (roleErr) {
+          console.error('[Scout] Error creating role:', roleErr);
+          // Leader was created, but role wasn't - show helpful message
+          showToast('✅ Leader added. Role will be assigned when user signs in.', 5000);
+        }
+      } else {
+        // No role specified or not admin - just create leader
+        showToast('✅ Leader added successfully');
+      }
       
       hideModal('#modal-add-leader');
-      showToast('✅ Leader added successfully');
       await loadLeaders();
     } catch (err) {
       console.error('[Scout] Error adding leader:', err);
@@ -1412,6 +1497,9 @@
     
     // Submit
     try {
+      // Clear cache before insert to ensure fresh data
+      meetingsData = [];
+      
       const { data, error } = await supabase
         .from('meetings')
         .insert({
@@ -1426,11 +1514,18 @@
       
       if (error) throw error;
       
+      // Reset form and hide modal
+      resetAddMeetingForm();
       hideModal('#modal-add-meeting');
-      showToast('✅ Meeting added successfully');
+      
+      // Reload meetings to refresh the list (this will repopulate meetingsData)
       await loadMeetings();
+      
+      showToast('✅ Meeting added successfully');
     } catch (err) {
       console.error('[Scout] Error adding meeting:', err);
+      // Clear cache on error too to prevent stale data
+      meetingsData = [];
       $('#add-meeting-error-banner').textContent = err.message || 'Failed to add meeting. Please try again.';
       $('#add-meeting-error-banner').style.display = 'block';
     }
