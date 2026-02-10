@@ -95,7 +95,7 @@ None currently.
 
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
-| 001 | Admin portal to invite and remove users - auto-invite when adding leaders | 2025-02-09 | TBD | [001-admin-portal-user-invites](./quick/001-admin-portal-user-invites/) |
+| 001 | Admin portal to invite and remove users - auto-invite when adding leaders | 2025-02-09 | ac97a94 | [001-admin-portal-user-invites](./quick/001-admin-portal-user-invites/) |
 
 ## Technical Context
 
