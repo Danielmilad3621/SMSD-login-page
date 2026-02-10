@@ -319,13 +319,25 @@
     const animationDelay = logo ? 3200 : 100;
     setTimeout(sessionCheck, animationDelay);
     
-    // Safety timeout: if nothing happens after 10 seconds, show login
+    // Safety timeout: if nothing happens after 6 seconds, show login
     setTimeout(() => {
       if (currentScreen === 'splash') {
         console.warn('[Scout] Splash screen timeout, forcing login');
         showScreen('login', 'left');
       }
-    }, 10000);
+    }, 6000);
+    
+    // Emergency fallback: force login after 8 seconds regardless
+    setTimeout(() => {
+      if (currentScreen === 'splash') {
+        console.error('[Scout] Emergency fallback: forcing login screen');
+        if (screens.login) {
+          screens.splash?.classList.remove('active');
+          screens.login.classList.add('active');
+          currentScreen = 'login';
+        }
+      }
+    }, 8000);
   }
 
   /* ── Listen for auth state changes (handles OAuth redirect) ── */
