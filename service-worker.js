@@ -1,9 +1,10 @@
 /* ============================================================
    Scout PWA — Service Worker
-   Cache-first strategy for static assets, offline fallback
+   Network-first for HTML/JS/CSS (always get latest code),
+   cache-first for static assets, offline fallback
    ============================================================ */
 
-const CACHE_NAME = 'scout-v4';
+const CACHE_NAME = 'scout-v6';
 
 // App shell — essential assets to pre-cache on install
 const APP_SHELL = [
@@ -14,6 +15,15 @@ const APP_SHELL = [
   './manifest.webmanifest',
   './assets/scout-logo.svg',
   './offline.html'
+];
+
+// Critical resources that should always try network first
+// to prevent serving stale broken code
+const NETWORK_FIRST = [
+  'index.html',
+  'app.js',
+  'styles.css',
+  'service-worker.js'
 ];
 
 /* ── Install: pre-cache the app shell ─────────────────────── */
@@ -46,7 +56,7 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-/* ── Fetch: cache-first for static, offline fallback for nav */
+/* ── Fetch handler ────────────────────────────────────────── */
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
@@ -56,15 +66,19 @@ self.addEventListener('fetch', (event) => {
   // Don't cache Supabase API calls — always go to network
   if (request.url.includes('supabase.co')) return;
 
-  event.respondWith(
-    caches.match(request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  // Don't cache the Supabase CDN library — always go to network
+  if (request.url.includes('cdn.jsdelivr.net')) return;
 
-      return fetch(request)
+  // Check if this is a critical resource that needs network-first
+  const isNetworkFirst = NETWORK_FIRST.some(file => request.url.endsWith(file))
+    || request.mode === 'navigate';
+
+  if (isNetworkFirst) {
+    // Network-first: try network, fall back to cache
+    event.respondWith(
+      fetch(request)
         .then((networkResponse) => {
-          // Cache successful responses for future use
+          // Cache the fresh response for offline use
           if (networkResponse && networkResponse.status === 200) {
             const responseClone = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
@@ -74,17 +88,39 @@ self.addEventListener('fetch', (event) => {
           return networkResponse;
         })
         .catch(() => {
-          // If the request is a navigation (HTML page), serve offline fallback
-          if (request.mode === 'navigate') {
-            return caches.match('./offline.html');
-          }
-          // For other requests (images, etc.) just fail silently
-          return new Response('', {
-            status: 408,
-            statusText: 'Offline'
+          // Network failed — try cache
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) return cachedResponse;
+            // If it's a navigation request, show offline page
+            if (request.mode === 'navigate') {
+              return caches.match('./offline.html');
+            }
+            return new Response('', { status: 408, statusText: 'Offline' });
           });
-        });
-    })
-  );
-});
+        })
+    );
+  } else {
+    // Cache-first for static assets (images, fonts, etc.)
+    event.respondWith(
+      caches.match(request).then((cachedResponse) => {
+        if (cachedResponse) {
+          return cachedResponse;
+        }
 
+        return fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => {
+                cache.put(request, responseClone);
+              });
+            }
+            return networkResponse;
+          })
+          .catch(() => {
+            return new Response('', { status: 408, statusText: 'Offline' });
+          });
+      })
+    );
+  }
+});
