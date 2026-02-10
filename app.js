@@ -11,7 +11,39 @@
   const SUPABASE_URL  = 'https://yhnjsvzfkoeqcgzlqvnj.supabase.co';
   const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inlobmpzdnpma29lcWNnemxxdm5qIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0NTg0NDMsImV4cCI6MjA4NjAzNDQ0M30.eNZXFZ7vTQJfyWmULSoaN3pXKmDbl6e6YV2c_AlwMk4';
 
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+  // Initialize Supabase client with error handling
+  let supabase;
+  if (!window.supabase) {
+    console.error('[Scout] Supabase library not loaded. Check network connection.');
+    // Show error on login screen
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginError = document.getElementById('login-error');
+      if (loginError) {
+        loginError.textContent = 'Failed to load. Please refresh the page.';
+        loginError.classList.add('visible');
+      }
+    });
+    // Create minimal mock to prevent crashes
+    supabase = {
+      auth: {
+        getSession: () => Promise.resolve({ data: { session: null }, error: new Error('Supabase not loaded') }),
+        signInWithOAuth: () => Promise.resolve({ error: new Error('Supabase not loaded') }),
+        signOut: () => Promise.resolve({ error: null }),
+        onAuthStateChange: () => ({ data: { subscription: null } })
+      },
+      from: () => ({
+        select: () => ({ eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: new Error('Supabase not loaded') }) }) })
+      }),
+      rpc: () => Promise.resolve({ data: null, error: new Error('Supabase not loaded') })
+    };
+  } else {
+    try {
+      supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    } catch (err) {
+      console.error('[Scout] Failed to create Supabase client:', err);
+      throw err;
+    }
+  }
 
   /* ── DOM references ───────────────────────────────────────── */
   const $ = (sel) => document.querySelector(sel);
@@ -41,6 +73,14 @@
   const loginError    = $('#login-error');
   const welcomeEmail  = $('#welcome-email');
   const btnLogout     = $('#btn-logout');
+  
+  // Validate critical DOM elements exist
+  if (!btnGoogle) {
+    console.error('[Scout] Critical: Google sign-in button not found');
+  }
+  if (!loginError) {
+    console.error('[Scout] Critical: Login error element not found');
+  }
 
   /* ── Current screen tracking ──────────────────────────────── */
   let currentScreen = 'splash';
@@ -210,48 +250,76 @@
 
   /* ── Handle authenticated user ─────────────────────────────── */
   async function handleAuthUser(user) {
-    const email = (user.email || '').trim().toLowerCase();
+    try {
+      const email = (user.email || '').trim().toLowerCase();
 
-    const invited = await isEmailInvited(email);
+      const invited = await isEmailInvited(email);
 
-    if (invited) {
-      showLoggedIn(email);
-    } else {
-      // Not on the allowlist — sign them out immediately
-      await supabase.auth.signOut();
-      loginError.textContent = "Access not granted — you're not on the invited list yet.";
-      loginError.classList.add('visible');
+      if (invited) {
+        showLoggedIn(email);
+      } else {
+        // Not on the allowlist — sign them out immediately
+        await supabase.auth.signOut();
+        if (loginError) {
+          loginError.textContent = "Access not granted — you're not on the invited list yet.";
+          loginError.classList.add('visible');
+        }
+        showScreen('login', 'right');
+      }
+    } catch (err) {
+      console.error('[Scout] Error in handleAuthUser:', err);
+      // Fallback: show login screen
       showScreen('login', 'right');
+      if (loginError) {
+        loginError.textContent = 'Error checking access. Please try again.';
+        loginError.classList.add('visible');
+      }
     }
   }
 
   /* ── Google Sign-In button ─────────────────────────────────── */
-  btnGoogle.addEventListener('click', async () => {
-    loginError.classList.remove('visible');
-    btnGoogle.disabled = true;
+  if (btnGoogle) {
+    btnGoogle.addEventListener('click', async () => {
+      if (loginError) loginError.classList.remove('visible');
+      btnGoogle.disabled = true;
 
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: window.location.origin + window.location.pathname,
-      },
+      try {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin + window.location.pathname,
+          },
+        });
+
+        if (error) {
+          if (loginError) {
+            loginError.textContent = 'Sign-in failed. Please try again.';
+            loginError.classList.add('visible');
+          }
+          console.error('[Scout] Google sign-in error:', error);
+        }
+      } catch (err) {
+        console.error('[Scout] Error in Google sign-in:', err);
+        if (loginError) {
+          loginError.textContent = 'Sign-in failed. Please try again.';
+          loginError.classList.add('visible');
+        }
+      } finally {
+        btnGoogle.disabled = false;
+      }
     });
-
-    if (error) {
-      loginError.textContent = 'Sign-in failed. Please try again.';
-      loginError.classList.add('visible');
-      console.error('[Scout] Google sign-in error:', error);
-    }
-
-    btnGoogle.disabled = false;
-  });
+  } else {
+    console.error('[Scout] Cannot attach Google sign-in handler: button not found');
+  }
 
   /* ── Logout ────────────────────────────────────────────────── */
-  btnLogout.addEventListener('click', async () => {
-    await supabase.auth.signOut();
-    showScreen('login', 'right');
-    showToast('Logged out');
-  });
+  if (btnLogout) {
+    btnLogout.addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      showScreen('login', 'right');
+      showToast('Logged out');
+    });
+  }
 
   /* ── Splash → next screen auto-transition ──────────────────── */
   function initSplash() {
@@ -3319,6 +3387,24 @@
   }
   
   /* ── Kick off ─────────────────────────────────────────────── */
-  initSplash();
+  // Wait for DOM to be fully ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      initSplash();
+    });
+  } else {
+    // DOM already loaded
+    initSplash();
+  }
+  
+  // Emergency fallback: if page is still on splash after 10 seconds, force login
+  setTimeout(() => {
+    if (currentScreen === 'splash' && screens.login) {
+      console.error('[Scout] Emergency: Forcing login screen after 10s');
+      screens.splash?.classList.remove('active');
+      screens.login.classList.add('active');
+      currentScreen = 'login';
+    }
+  }, 10000);
 
 })();
