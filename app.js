@@ -100,6 +100,7 @@
       if (screens.login) {
         target = 'login';
       } else {
+        console.error('[Scout] Login screen also not found - cannot proceed');
         return;
       }
     }
@@ -109,24 +110,43 @@
     
     // Additional safety checks
     if (!incoming) {
-      console.error(`[Scout] Cannot transition to screen "${target}"`);
+      console.error(`[Scout] Cannot transition to screen "${target}" - element is null`);
+      // Emergency: try direct DOM manipulation
+      if (target === 'login') {
+        const loginEl = document.getElementById('login');
+        if (loginEl) {
+          document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+          loginEl.classList.add('active');
+          currentScreen = 'login';
+        }
+      }
       return;
     }
 
-    incoming.classList.remove('slide-left', 'slide-right');
-    incoming.classList.add(direction === 'left' ? 'slide-right' : 'slide-left');
+    try {
+      incoming.classList.remove('slide-left', 'slide-right');
+      incoming.classList.add(direction === 'left' ? 'slide-right' : 'slide-left');
 
-    void incoming.offsetWidth;
+      void incoming.offsetWidth;
 
-    if (outgoing) {
-      outgoing.classList.remove('active');
-      outgoing.classList.add(direction === 'left' ? 'slide-left' : 'slide-right');
+      if (outgoing) {
+        outgoing.classList.remove('active');
+        outgoing.classList.add(direction === 'left' ? 'slide-left' : 'slide-right');
+      }
+
+      incoming.classList.remove('slide-left', 'slide-right');
+      incoming.classList.add('active');
+
+      currentScreen = target;
+    } catch (err) {
+      console.error('[Scout] Error in showScreen:', err);
+      // Emergency fallback: direct DOM manipulation
+      if (incoming) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        incoming.classList.add('active');
+        currentScreen = target;
+      }
     }
-
-    incoming.classList.remove('slide-left', 'slide-right');
-    incoming.classList.add('active');
-
-    currentScreen = target;
   }
 
   /* ── Toast helper ─────────────────────────────────────────── */
