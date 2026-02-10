@@ -91,6 +91,12 @@
 
 None currently.
 
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 001 | Admin portal to invite and remove users - auto-invite when adding leaders | 2025-02-09 | TBD | [001-admin-portal-user-invites](./quick/001-admin-portal-user-invites/) |
+
 ## Technical Context
 
 **Stack:**
@@ -143,5 +149,6 @@ None currently.
   - `leader_id` field in attendance table tracks who took attendance, not who attended
 
 ---
-*Last updated: 2025-02-09*
+*Last updated: 2025-02-09*  
+*Last activity: 2025-02-09 - Completed quick task 001: Admin portal to invite and remove users - auto-invite when adding leaders*
 

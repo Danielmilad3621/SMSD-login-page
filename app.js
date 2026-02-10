@@ -24,6 +24,7 @@
     leaders:  $('#leaders-screen'),
     meetings: $('#meetings-screen'),
     attendance: $('#attendance-screen'),
+    users:    $('#users-screen'),
   };
   
   // Validate critical screens exist
@@ -170,6 +171,7 @@
   async function setupNavigation() {
     const navMenu = $('#nav-menu');
     const dashboardHelper = $('#dashboard-helper');
+    const navUsers = $('#nav-users');
     
     if (await canManageParticipants()) {
       navMenu.style.display = 'flex';
@@ -177,6 +179,14 @@
     } else {
       navMenu.style.display = 'none';
       dashboardHelper.style.display = 'block';
+    }
+    
+    // Show Users button only for Admin
+    const isAdminUser = await isAdmin();
+    if (isAdminUser) {
+      navUsers.style.display = 'block';
+    } else {
+      navUsers.style.display = 'none';
     }
   }
 
@@ -359,6 +369,15 @@
   
   $('#attendance-back')?.addEventListener('click', () => {
     showScreen('meetings', 'right');
+  });
+  
+  $('#nav-users')?.addEventListener('click', () => {
+    showScreen('users', 'left');
+    loadInvitedUsers();
+  });
+  
+  $('#users-back')?.addEventListener('click', () => {
+    showScreen('loggedIn', 'right');
   });
   
   /* ── Scouts Management ─────────────────────────────────────── */
@@ -998,6 +1017,25 @@
       if (leaderError) {
         hideModal('#modal-add-leader');
         throw leaderError;
+      }
+      
+      // Auto-invite leader by adding to invited_users table
+      try {
+        const { error: inviteError } = await supabase
+          .from('invited_users')
+          .insert({ email: email })
+          .select()
+          .maybeSingle();
+        
+        if (inviteError) {
+          // If user already invited, that's fine - just log it
+          if (inviteError.code !== '23505') { // Not a duplicate key error
+            console.warn('[Scout] Could not auto-invite leader:', inviteError);
+          }
+        }
+      } catch (inviteErr) {
+        // Don't fail leader creation if invite fails
+        console.warn('[Scout] Error auto-inviting leader:', inviteErr);
       }
       
       // Create role if specified and user is admin
@@ -1964,6 +2002,399 @@
       showToast(`Failed to remove leader. Please try again.`, 4000);
     }
   }
+  
+  /* ── Users Management (Admin Only) ───────────────────────── */
+  let invitedUsersData = [];
+  
+  async function loadInvitedUsers() {
+    const loadingEl = $('#users-loading');
+    const errorEl = $('#users-error');
+    const listEl = $('#users-list');
+    const emptyEl = $('#users-empty');
+    const actionBar = $('#users-action-bar');
+    
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'none';
+    
+    // Check if user is Admin
+    const isAdminUser = await isAdmin();
+    if (!isAdminUser) {
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'flex';
+      errorEl.querySelector('.error-text').textContent = 'Access denied. Admin only.';
+      return;
+    }
+    
+    // Show add button for Admin
+    actionBar.style.display = 'block';
+    
+    try {
+      const { data, error } = await supabase
+        .from('invited_users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      invitedUsersData = data || [];
+      renderInvitedUsers();
+      
+      loadingEl.style.display = 'none';
+    } catch (err) {
+      console.error('[Scout] Error loading invited users:', err);
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'flex';
+      errorEl.querySelector('.error-text').textContent = 'Failed to load users. Please try again.';
+    }
+  }
+  
+  function renderInvitedUsers() {
+    const listEl = $('#users-list');
+    const emptyEl = $('#users-empty');
+    
+    if (invitedUsersData.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'flex';
+      return;
+    }
+    
+    emptyEl.style.display = 'none';
+    
+    let html = '<div class="cards-grid">';
+    invitedUsersData.forEach(user => {
+      const date = new Date(user.created_at).toLocaleDateString();
+      html += `
+        <div class="participant-card" data-user-email="${escapeHtml(user.email)}">
+          <div class="card-header">
+            <h3 class="card-name">${escapeHtml(user.email)}</h3>
+            <div class="card-actions">
+              <button class="btn-icon btn-delete-user" data-user-email="${escapeHtml(user.email)}" aria-label="Remove user" style="color: var(--color-error, #dc3545);">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="card-details">
+            <div class="card-detail">
+              <strong>Invited:</strong> ${date}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    
+    listEl.innerHTML = html;
+    
+    // Attach event listeners
+    attachUserEventListeners();
+  }
+  
+  function attachUserEventListeners() {
+    document.querySelectorAll('.btn-delete-user').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const email = e.target.closest('.btn-delete-user').dataset.userEmail;
+        const user = invitedUsersData.find(u => u.email === email);
+        if (user) {
+          removeInvitedUser(user);
+        }
+      });
+    });
+  }
+  
+  /* ── Add User Form ───────────────────────────────────────── */
+  $('#btn-add-user')?.addEventListener('click', () => {
+    showModal('#modal-add-user');
+    resetAddUserForm();
+  });
+  
+  $('#close-add-user')?.addEventListener('click', () => {
+    hideModal('#modal-add-user');
+  });
+  
+  $('#cancel-add-user')?.addEventListener('click', () => {
+    hideModal('#modal-add-user');
+  });
+  
+  $('#modal-add-user')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-add-user') {
+      hideModal('#modal-add-user');
+    }
+  });
+  
+  function resetAddUserForm() {
+    $('#form-add-user').reset();
+    clearFormErrors('add-user');
+    $('#add-user-error-banner').style.display = 'none';
+  }
+  
+  $('#form-add-user')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearFormErrors('add-user');
+    
+    const email = $('#add-user-email').value.trim().toLowerCase();
+    
+    // Validation
+    let hasErrors = false;
+    
+    if (!email) {
+      showFieldError('add-user-email', 'Email is required');
+      hasErrors = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showFieldError('add-user-email', 'Please enter a valid email address');
+      hasErrors = true;
+    } else {
+      // Check for duplicate email
+      const existing = invitedUsersData.find(u => u.email.toLowerCase() === email);
+      if (existing) {
+        showFieldError('add-user-email', 'This email is already invited');
+        hasErrors = true;
+      }
+    }
+    
+    if (hasErrors) return;
+    
+    // Submit
+    try {
+      const { error } = await supabase
+        .from('invited_users')
+        .insert({ email })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      hideModal('#modal-add-user');
+      await loadInvitedUsers();
+      showToast('✅ User invited successfully', 4000);
+    } catch (err) {
+      console.error('[Scout] Error adding user:', err);
+      $('#add-user-error-banner').textContent = err.message || 'Failed to add user. Please try again.';
+      $('#add-user-error-banner').style.display = 'block';
+    }
+  });
+  
+  /* ── Remove Invited User ─────────────────────────────────── */
+  async function removeInvitedUser(user) {
+    if (!confirm(`Are you sure you want to remove "${user.email}" from the invited users list?\n\nThey will no longer be able to sign in to the portal.`)) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('invited_users')
+        .delete()
+        .eq('email', user.email);
+      
+      if (error) throw error;
+      
+      showToast(`✅ ${user.email} removed from invited users`, 4000);
+      await loadInvitedUsers();
+    } catch (err) {
+      console.error('[Scout] Error removing user:', err);
+      showToast('Failed to remove user. Please try again.', 4000);
+    }
+  }
+  
+  /* ── Users Management (Admin Only) ───────────────────────── */
+  let invitedUsersData = [];
+  
+  async function loadInvitedUsers() {
+    const loadingEl = $('#users-loading');
+    const errorEl = $('#users-error');
+    const listEl = $('#users-list');
+    const emptyEl = $('#users-empty');
+    const actionBar = $('#users-action-bar');
+    
+    loadingEl.style.display = 'flex';
+    errorEl.style.display = 'none';
+    listEl.innerHTML = '';
+    emptyEl.style.display = 'none';
+    
+    // Check if user is Admin
+    const isAdminUser = await isAdmin();
+    if (!isAdminUser) {
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'flex';
+      errorEl.querySelector('.error-text').textContent = 'Access denied. Admin only.';
+      return;
+    }
+    
+    // Show add button for Admin
+    actionBar.style.display = 'block';
+    
+    try {
+      const { data, error } = await supabase
+        .from('invited_users')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      invitedUsersData = data || [];
+      renderInvitedUsers();
+      
+      loadingEl.style.display = 'none';
+    } catch (err) {
+      console.error('[Scout] Error loading invited users:', err);
+      loadingEl.style.display = 'none';
+      errorEl.style.display = 'flex';
+      errorEl.querySelector('.error-text').textContent = 'Failed to load users. Please try again.';
+    }
+  }
+  
+  function renderInvitedUsers() {
+    const listEl = $('#users-list');
+    const emptyEl = $('#users-empty');
+    
+    if (invitedUsersData.length === 0) {
+      listEl.innerHTML = '';
+      emptyEl.style.display = 'flex';
+      return;
+    }
+    
+    emptyEl.style.display = 'none';
+    
+    let html = '<div class="cards-grid">';
+    invitedUsersData.forEach(user => {
+      const date = new Date(user.created_at).toLocaleDateString();
+      html += `
+        <div class="participant-card" data-user-email="${escapeHtml(user.email)}">
+          <div class="card-header">
+            <h3 class="card-name">${escapeHtml(user.email)}</h3>
+            <div class="card-actions">
+              <button class="btn-icon btn-delete-user" data-user-email="${escapeHtml(user.email)}" aria-label="Remove user" style="color: var(--color-error, #dc3545);">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="card-details">
+            <div class="card-detail">
+              <strong>Invited:</strong> ${date}
+            </div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    
+    listEl.innerHTML = html;
+    
+    // Attach event listeners
+    attachUserEventListeners();
+  }
+  
+  function attachUserEventListeners() {
+    document.querySelectorAll('.btn-delete-user').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const email = e.target.closest('.btn-delete-user').dataset.userEmail;
+        const user = invitedUsersData.find(u => u.email === email);
+        if (user) {
+          removeInvitedUser(user);
+        }
+      });
+    });
+  }
+  
+  /* ── Add User Form ───────────────────────────────────────── */
+  $('#btn-add-user')?.addEventListener('click', () => {
+    showModal('#modal-add-user');
+    resetAddUserForm();
+  });
+  
+  $('#close-add-user')?.addEventListener('click', () => {
+    hideModal('#modal-add-user');
+  });
+  
+  $('#cancel-add-user')?.addEventListener('click', () => {
+    hideModal('#modal-add-user');
+  });
+  
+  $('#modal-add-user')?.addEventListener('click', (e) => {
+    if (e.target.id === 'modal-add-user') {
+      hideModal('#modal-add-user');
+    }
+  });
+  
+  function resetAddUserForm() {
+    $('#form-add-user').reset();
+    clearFormErrors('add-user');
+    $('#add-user-error-banner').style.display = 'none';
+  }
+  
+  $('#form-add-user')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearFormErrors('add-user');
+    
+    const email = $('#add-user-email').value.trim().toLowerCase();
+    
+    // Validation
+    let hasErrors = false;
+    
+    if (!email) {
+      showFieldError('add-user-email', 'Email is required');
+      hasErrors = true;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showFieldError('add-user-email', 'Please enter a valid email address');
+      hasErrors = true;
+    } else {
+      // Check for duplicate email
+      const existing = invitedUsersData.find(u => u.email.toLowerCase() === email);
+      if (existing) {
+        showFieldError('add-user-email', 'This email is already invited');
+        hasErrors = true;
+      }
+    }
+    
+    if (hasErrors) return;
+    
+    // Submit
+    try {
+      const { error } = await supabase
+        .from('invited_users')
+        .insert({ email })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      hideModal('#modal-add-user');
+      await loadInvitedUsers();
+      showToast('✅ User invited successfully', 4000);
+    } catch (err) {
+      console.error('[Scout] Error adding user:', err);
+      $('#add-user-error-banner').textContent = err.message || 'Failed to add user. Please try again.';
+      $('#add-user-error-banner').style.display = 'block';
+    }
+  });
+  
+  /* ── Remove Invited User ─────────────────────────────────── */
+  async function removeInvitedUser(user) {
+    if (!confirm(`Are you sure you want to remove "${user.email}" from the invited users list?\n\nThey will no longer be able to sign in to the portal.`)) {
+      return;
+    }
+    
+    try {
+      const { error } = await supabase
+        .from('invited_users')
+        .delete()
+        .eq('email', user.email);
+      
+      if (error) throw error;
+      
+      showToast(`✅ ${user.email} removed from invited users`, 4000);
+      await loadInvitedUsers();
+    } catch (err) {
+      console.error('[Scout] Error removing user:', err);
+      showToast('Failed to remove user. Please try again.', 4000);
+    }
+  }
+  
+  // Retry handler for users screen
+  $('#users-retry')?.addEventListener('click', () => {
+    loadInvitedUsers();
+  });
   
   /* ── Edit Meeting (Inline) ────────────────────────────────── */
   async function editMeeting(meeting) {

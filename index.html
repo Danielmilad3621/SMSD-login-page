@@ -195,6 +195,9 @@
           <button type="button" class="nav-btn" id="nav-meetings" data-screen="meetings">
             Meetings
           </button>
+          <button type="button" class="nav-btn" id="nav-users" data-screen="users" style="display: none;">
+            Users
+          </button>
         </nav>
         
         <p class="helper-text" style="text-align:center; margin-bottom:var(--space-lg);" id="dashboard-helper">You're signed in. More features coming soon.</p>
@@ -440,10 +443,78 @@
     </div>
   </section>
 
+  <!-- ═══════════════════════════════════════════════════════
+       SCREEN 7 — Users Management (Admin Only)
+       ═══════════════════════════════════════════════════════ -->
+  <section id="users-screen" class="screen" aria-label="Users management">
+    <div class="screen-header">
+      <button type="button" class="btn-back" id="users-back" aria-label="Back to dashboard">
+        ← Back
+      </button>
+      <h1 class="screen-title">Invited Users</h1>
+    </div>
+
+    <div class="screen-content">
+      <!-- Add User Button (Admin only) -->
+      <div class="action-bar" id="users-action-bar" style="display: none;">
+        <button type="button" class="btn btn-primary" id="btn-add-user">
+          + Add User
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="users-loading" style="display: none;">
+        <div class="spinner"></div>
+        <p>Loading users...</p>
+      </div>
+
+      <!-- Error State -->
+      <div class="error-state" id="users-error" style="display: none;">
+        <p class="error-text"></p>
+        <button type="button" class="btn btn-secondary" id="users-retry">Retry</button>
+      </div>
+
+      <!-- Users List -->
+      <div class="list-container" id="users-list">
+        <!-- Users will be rendered here -->
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="users-empty" style="display: none;">
+        <p>No invited users found.</p>
+      </div>
+    </div>
+  </section>
+
 </div><!-- /#app -->
 
 <!-- Toast -->
 <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+<!-- Modal: Add User -->
+<div class="modal-overlay" id="modal-add-user">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Add Invited User</h2>
+      <button type="button" class="btn-close" id="close-add-user">×</button>
+    </div>
+    <form id="form-add-user">
+      <div id="add-user-error-banner" class="error-banner" style="display: none;"></div>
+      
+      <div class="form-row">
+        <label for="add-user-email">Email *</label>
+        <input type="email" id="add-user-email" name="email" required placeholder="user@example.com" />
+        <div class="form-error" id="add-user-email-error"></div>
+        <p class="helper-text">This user will be able to sign in to the portal.</p>
+      </div>
+      
+      <div class="form-actions">
+        <button type="button" class="btn btn-secondary" id="cancel-add-user">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add User</button>
+      </div>
+    </form>
+  </div>
+</div>
 
 <!-- Modal: Add Scout -->
 <div class="modal-overlay" id="modal-add-scout">
