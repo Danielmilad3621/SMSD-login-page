@@ -315,6 +315,13 @@
       actionBar.style.display = 'none';
     }
     
+    // Show/hide recalculate points button (Admin only)
+    const recalculateBtn = $('#btn-recalculate-points');
+    if (recalculateBtn) {
+      const isAdminUser = await isAdmin();
+      recalculateBtn.style.display = isAdminUser ? 'block' : 'none';
+    }
+    
     try {
       const { data, error } = await supabase
         .from('scouts')
