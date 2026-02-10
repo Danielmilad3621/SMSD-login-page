@@ -301,15 +301,54 @@
   if (btnGoogle) {
     btnGoogle.addEventListener('click', async () => {
       if (loginError) loginError.classList.remove('visible');
+      
+      // Check if Supabase is actually loaded
+      if (!window.supabase) {
+        console.error('[Scout] Supabase library not loaded');
+        if (loginError) {
+          loginError.textContent = 'Failed to load authentication. Please refresh the page.';
+          loginError.classList.add('visible');
+        }
+        return;
+      }
+      
+      // Check if supabase client was created successfully
+      if (!supabase || !supabase.auth) {
+        console.error('[Scout] Supabase client not initialized');
+        if (loginError) {
+          loginError.textContent = 'Authentication service unavailable. Please refresh the page.';
+          loginError.classList.add('visible');
+        }
+        return;
+      }
+      
       btnGoogle.disabled = true;
+      const originalText = btnGoogle.textContent;
+      btnGoogle.textContent = 'Connecting...';
 
       try {
-        const { error } = await supabase.auth.signInWithOAuth({
+        // Wrap OAuth call with timeout protection to prevent indefinite hang
+        const oauthPromise = supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
             redirectTo: window.location.origin + window.location.pathname,
           },
         });
+
+        // Race between OAuth and timeout (10 seconds)
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('OAuth timeout')), 10000)
+        );
+
+        let result;
+        try {
+          result = await Promise.race([oauthPromise, timeoutPromise]);
+        } catch (raceErr) {
+          // Timeout occurred
+          throw new Error('OAuth request timed out. Please try again.');
+        }
+
+        const { error } = result || {};
 
         if (error) {
           if (loginError) {
@@ -317,15 +356,21 @@
             loginError.classList.add('visible');
           }
           console.error('[Scout] Google sign-in error:', error);
+          btnGoogle.disabled = false;
+          btnGoogle.textContent = originalText;
         }
+        // If no error, OAuth redirect will happen, so button state doesn't matter
       } catch (err) {
         console.error('[Scout] Error in Google sign-in:', err);
         if (loginError) {
-          loginError.textContent = 'Sign-in failed. Please try again.';
+          const errorMsg = err.message && err.message.includes('timeout') 
+            ? 'Connection timeout. Please check your internet and try again.'
+            : 'Sign-in failed. Please try again.';
+          loginError.textContent = errorMsg;
           loginError.classList.add('visible');
         }
-      } finally {
         btnGoogle.disabled = false;
+        btnGoogle.textContent = originalText;
       }
     });
   } else {
