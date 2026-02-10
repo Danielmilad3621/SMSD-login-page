@@ -273,7 +273,7 @@
       }, 2200);
     }
 
-    // Use Promise.race to prevent hanging on slow connections
+    // Use timeout wrapper to prevent hanging on slow connections
     const sessionCheck = async () => {
       try {
         // Check for an existing Supabase session with timeout
@@ -282,10 +282,20 @@
           setTimeout(() => reject(new Error('Session check timeout')), 5000)
         );
         
-        const { data: { session }, error } = await Promise.race([
-          sessionPromise,
-          timeoutPromise
-        ]);
+        let sessionResult;
+        try {
+          sessionResult = await Promise.race([
+            sessionPromise,
+            timeoutPromise
+          ]);
+        } catch (raceErr) {
+          // Timeout or other race error - show login
+          console.warn('[Scout] Session check timeout or error:', raceErr.message);
+          showScreen('login', 'left');
+          return;
+        }
+
+        const { data: { session }, error } = sessionResult || {};
 
         if (error) {
           console.error('[Scout] Error checking session:', error);
@@ -300,7 +310,7 @@
         }
       } catch (err) {
         console.error('[Scout] Error in initSplash:', err);
-        // Fallback to login screen on any error (including timeout)
+        // Fallback to login screen on any error
         showScreen('login', 'left');
       }
     };
