@@ -700,6 +700,14 @@
     resetAddScoutForm();
   });
   
+  $('#btn-recalculate-points')?.addEventListener('click', async () => {
+    if (!confirm('This will recalculate all scout points from attendance records. Continue?')) {
+      return;
+    }
+    
+    await recalculateAllPoints();
+  });
+  
   $('#close-add-scout')?.addEventListener('click', () => {
     hideModal('#modal-add-scout');
   });
@@ -2523,6 +2531,81 @@
   
   // Make retry function available globally
   window.retrySaveAttendance = saveAttendance;
+  
+  /* ── Points Recalculation ──────────────────────────────────── */
+  async function recalculateAllPoints() {
+    const btn = $('#btn-recalculate-points');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '🔄 Recalculating...';
+    }
+    
+    try {
+      // Check if user is admin
+      if (!(await isAdmin())) {
+        throw new Error('Only admins can recalculate points');
+      }
+      
+      // Get all attendance records grouped by scout_id
+      const { data: attendanceRecords, error: attendanceError } = await supabase
+        .from('attendance')
+        .select('scout_id, points_earned');
+      
+      if (attendanceError) throw attendanceError;
+      
+      // Calculate total points for each scout
+      const pointsByScout = {};
+      (attendanceRecords || []).forEach(record => {
+        if (record.scout_id) {
+          if (!pointsByScout[record.scout_id]) {
+            pointsByScout[record.scout_id] = 0;
+          }
+          pointsByScout[record.scout_id] += (record.points_earned || 0);
+        }
+      });
+      
+      // Get all scouts
+      const { data: scouts, error: scoutsError } = await supabase
+        .from('scouts')
+        .select('id');
+      
+      if (scoutsError) throw scoutsError;
+      
+      // Update points_total for each scout
+      let updated = 0;
+      let errors = 0;
+      
+      for (const scout of scouts || []) {
+        const calculatedTotal = pointsByScout[scout.id] || 0;
+        
+        const { error: updateError } = await supabase
+          .from('scouts')
+          .update({ points_total: calculatedTotal })
+          .eq('id', scout.id);
+        
+        if (updateError) {
+          console.error(`[Scout] Error updating points for scout ${scout.id}:`, updateError);
+          errors++;
+        } else {
+          updated++;
+        }
+      }
+      
+      // Reload scouts list to show updated points
+      await loadScouts();
+      
+      showToast(`✅ Points recalculated: ${updated} scouts updated${errors > 0 ? `, ${errors} errors` : ''}`, 4000);
+      
+    } catch (err) {
+      console.error('[Scout] Error recalculating points:', err);
+      showToast('Failed to recalculate points. Please try again.', 4000);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = '🔄 Recalculate Points';
+      }
+    }
+  }
   
   /* ── Kick off ─────────────────────────────────────────────── */
   initSplash();

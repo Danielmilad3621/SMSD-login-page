@@ -51,14 +51,14 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 
 ### Points System
 
-- [ ] **POINT-01**: System automatically awards 1 point when scout marked Present
-- [ ] **POINT-02**: System automatically awards 1 point when leader marked Present
-- [ ] **POINT-03**: Admin/Admin Leader can award additional activity points during meeting
-- [ ] **POINT-04**: System calculates total points per scout (meeting points + activity points)
-- [ ] **POINT-05**: System tracks points cumulatively (total increases over time)
-- [ ] **POINT-06**: System displays scout's total points in participant list
-- [ ] **POINT-07**: System recalculates points when attendance status changes
-- [ ] **POINT-08**: Points are tracking-only (not redeemable in v1)
+- [x] **POINT-01**: System automatically awards 1 point when scout marked Present — Phase 4
+- [ ] **POINT-02**: System automatically awards 1 point when leader marked Present — Deferred to v2 (leader attendance not persisted)
+- [x] **POINT-03**: Admin/Admin Leader can award additional activity points during meeting — Phase 4
+- [x] **POINT-04**: System calculates total points per scout (meeting points + activity points) — Phase 4
+- [x] **POINT-05**: System tracks points cumulatively (total increases over time) — Phase 4
+- [x] **POINT-06**: System displays scout's total points in participant list — Phase 2
+- [x] **POINT-07**: System recalculates points when attendance status changes — Phase 4
+- [x] **POINT-08**: Points are tracking-only (not redeemable in v1) — Phase 4
 
 ### Reporting & Export
 
@@ -122,7 +122,8 @@ Requirements for v1 attendance tracking system. All requirements are user-centri
 | MEET-01 to MEET-06 | Meeting Management | Phase 3 | Pending |
 | ATTEND-01 to ATTEND-10 | Attendance Taking | Phase 4 | Pending |
 | PERM-05 | Permission System | Phase 4 | Pending |
-| POINT-01 to POINT-08 | Points System | Phase 5 | Pending |
+| POINT-01, POINT-03 to POINT-08 | Points System | Phase 5 | Complete |
+| POINT-02 | Points System | Phase 5 | Deferred to v2 |
 | REPORT-01 to REPORT-09 | Reporting & Export | Phase 6 | Pending |
 | PERM-03, PERM-04 | Permission System | Phase 6 | Pending |
 
