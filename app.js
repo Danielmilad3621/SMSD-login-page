@@ -1047,6 +1047,9 @@
     const emptyEl = $('#meetings-empty');
     const actionBar = $('#meetings-action-bar');
     
+    // Clear cache first to ensure fresh data
+    meetingsData = [];
+    
     loadingEl.style.display = 'flex';
     errorEl.style.display = 'none';
     listEl.innerHTML = '';
@@ -1070,12 +1073,15 @@
       
       if (error) throw error;
       
+      // Update cache with fresh data
       meetingsData = data || [];
       renderMeetings();
       
       loadingEl.style.display = 'none';
     } catch (err) {
       console.error('[Scout] Error loading meetings:', err);
+      // Clear cache on error
+      meetingsData = [];
       loadingEl.style.display = 'none';
       errorEl.style.display = 'flex';
       errorEl.querySelector('.error-text').textContent = 'Failed to load meetings. Please try again.';
