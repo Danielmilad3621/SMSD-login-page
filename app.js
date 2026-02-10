@@ -676,6 +676,9 @@
             <button class="btn-icon btn-edit-leader" data-leader-id="${leader.id}" aria-label="Edit leader">
               ✏️
             </button>
+            <button class="btn-icon btn-delete-leader" data-leader-id="${leader.id}" aria-label="Delete leader" style="color: var(--color-error, #dc3545);">
+              🗑️
+            </button>
           </div>
         </div>
         <div class="card-details">
@@ -700,6 +703,16 @@
         const leader = leadersData.find(l => l.id === leaderId);
         if (leader) {
           editLeader(leader);
+        }
+      });
+    });
+    
+    document.querySelectorAll('.btn-delete-leader').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const leaderId = e.target.closest('.btn-delete-leader').dataset.leaderId;
+        const leader = leadersData.find(l => l.id === leaderId);
+        if (leader) {
+          deleteLeader(leader);
         }
       });
     });
@@ -1892,6 +1905,64 @@
         errorEl.style.display = 'none';
       }
     });
+  }
+  
+  /* ── Delete Leader ───────────────────────────────────────── */
+  async function deleteLeader(leader) {
+    // Check if leader is assigned to any meetings
+    // Query all meetings and filter in JavaScript since Supabase doesn't support array contains directly
+    const { data: allMeetings, error: meetingsError } = await supabase
+      .from('meetings')
+      .select('id, date, location, assigned_leaders');
+    
+    const meetings = allMeetings?.filter(m => 
+      m.assigned_leaders && m.assigned_leaders.includes(leader.id)
+    ) || [];
+    
+    let warningMessage = `Are you sure you want to remove "${leader.name}" from the leaders list?`;
+    
+    if (meetings && meetings.length > 0) {
+      const meetingList = meetings.map(m => {
+        const date = new Date(m.date).toLocaleDateString();
+        return `- ${date} at ${m.location || 'TBD'}`;
+      }).join('\n');
+      
+      warningMessage += `\n\n⚠️ This leader is assigned to ${meetings.length} meeting(s):\n${meetingList}\n\nThey will be removed from these meetings.`;
+    }
+    
+    // Confirm deletion
+    if (!confirm(warningMessage)) {
+      return;
+    }
+    
+    try {
+      // Soft delete: set active = false
+      const { error } = await supabase
+        .from('leaders')
+        .update({ active: false })
+        .eq('id', leader.id);
+      
+      if (error) throw error;
+      
+      // Remove leader from assigned_leaders in meetings
+      if (meetings && meetings.length > 0) {
+        for (const meeting of meetings) {
+          const currentLeaders = meeting.assigned_leaders || [];
+          const updatedLeaders = currentLeaders.filter(id => id !== leader.id);
+          
+          await supabase
+            .from('meetings')
+            .update({ assigned_leaders: updatedLeaders })
+            .eq('id', meeting.id);
+        }
+      }
+      
+      showToast(`✅ ${leader.name} removed from leaders list`, 4000);
+      await loadLeaders();
+    } catch (err) {
+      console.error('[Scout] Error deleting leader:', err);
+      showToast(`Failed to remove leader. Please try again.`, 4000);
+    }
   }
   
   /* ── Edit Meeting (Inline) ────────────────────────────────── */
