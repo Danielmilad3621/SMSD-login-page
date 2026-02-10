@@ -110,11 +110,36 @@ Three critical bugs reported when accessing app on phone via Vercel:
 - Better error messaging and visibility
 - Safety fallbacks to prevent freezing
 
+## Additional Fix: Leader Role Assignment Root Cause
+
+### Root Cause Identified
+**Issue:** Leaders table doesn't have a role column - roles are in separate `roles` table. When assigning roles:
+1. Leader is created with `user_id = NULL`
+2. `create_leader_role` function requires user to exist in auth.users
+3. Function creates role but doesn't link leader's `user_id`
+4. Result: Role exists but leader isn't linked, so role assignment appears to fail
+
+### Fix Applied
+1. **Created new function `create_leader_with_role`** that:
+   - Links leader to user by email (updates `leaders.user_id`)
+   - Creates/updates role in `roles` table
+   - All in one transaction
+
+2. **Updated app.js** to use new function with leader_id parameter
+
+3. **Linked existing leaders** to their auth.users accounts via migration
+
+### Database Changes
+- Migration: `create_leader_with_role_function` - New function that links and assigns role
+- Migration: `link_existing_leaders_to_users` - Fixed existing data by linking leaders to users
+
 ## Testing Checklist
 
 - [ ] Test page refresh on mobile - should not freeze
-- [ ] Test leader role assignment - toast should be visible
+- [ ] Test leader role assignment - toast should be visible AND role should be saved
 - [ ] Test meeting creation - should work and show errors clearly
 - [ ] Verify toast appears above modals
 - [ ] Check timeout behavior on slow connections
+- [ ] Verify existing leaders are linked to their auth.users accounts
+- [ ] Test adding new leader with role - should link user_id and create role
 

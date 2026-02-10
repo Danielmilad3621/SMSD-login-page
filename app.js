@@ -989,32 +989,25 @@
       
       // Create role if specified and user is admin
       // Note: Roles require user_id from auth.users
-      // We need to find the user by email to get their user_id
+      // The new function will link the leader to the user AND create the role
       if (currentUserIsAdmin && role) {
-        // Try to create role using a database function
-        // The function will find user by email and create role
+        // Use the improved function that links leader to user and creates role
         try {
-          const { data: roleData, error: roleError } = await supabase.rpc('create_leader_role', {
+          const { data: roleData, error: roleError } = await supabase.rpc('create_leader_with_role', {
+            leader_id: leaderData.id,
             leader_email: email,
             role_name: role
           });
           
           if (roleError) {
-            // If RPC function doesn't exist, we need to create it
-            // For now, show helpful message
-            if (roleError.message && roleError.message.includes('function') && roleError.message.includes('does not exist')) {
-              console.warn('[Scout] create_leader_role function not found. Creating leader without role.');
-              // Hide modal first so toast is visible
-              hideModal('#modal-add-leader');
-              await loadLeaders();
-              showToast('✅ Leader added. Note: Please assign role manually after user signs in.', 6000);
-            } else if (roleError.message && roleError.message.includes('does not exist')) {
+            // Check error type
+            if (roleError.message && roleError.message.includes('does not exist')) {
               // User doesn't exist in auth.users
               console.warn('[Scout] Could not create role - user not found:', roleError.message);
               // Hide modal first so toast is visible
               hideModal('#modal-add-leader');
               await loadLeaders();
-              showToast('✅ Leader added. Role requires user to sign in first. Role will be assigned automatically when they sign in.', 7000);
+              showToast('✅ Leader added. Role requires user to sign in first. Please assign role manually after they sign in.', 7000);
             } else {
               // Other error
               console.warn('[Scout] Could not create role:', roleError.message);
@@ -1024,7 +1017,7 @@
               showToast('✅ Leader added. Role assignment failed. Please assign role manually after user signs in.', 6000);
             }
           } else {
-            // Role created successfully
+            // Role created and leader linked successfully
             hideModal('#modal-add-leader');
             await loadLeaders();
             showToast('✅ Leader and role added successfully', 4000);
